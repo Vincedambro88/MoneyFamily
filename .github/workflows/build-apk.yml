@@ -44,7 +44,6 @@ jobs:
           if 'import androidx.compose.ui.draw.clip' not in s:
               s = s.replace('import androidx.compose.ui.Modifier\n', 'import androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.clip\n')
           s = s.replace('values.maxOf{abs(it.second)}', 'values.maxOf{kotlin.math.abs(it.second)}')
-          s = s.replace('val fraction=(kotlin.math.abs(value)/maxAbs).toFloat()', 'val fraction=(kotlin.math.abs(value)/maxAbs).toFloat()')
           p.write_text(s)
           PY
           git diff --check
@@ -68,3 +67,5 @@ jobs:
           name: MoneyFamily-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+# Build trigger for the corrected dashboard source
