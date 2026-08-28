@@ -37,34 +37,71 @@ class RoomRepository(context: Context) {
     suspend fun setMemberActive(id: Long, active: Boolean) = members.setActive(id, active)
 
     suspend fun allMappings(): List<TypeCategoryEntity> { seedDefaults(); return mappings.all() }
-    suspend fun categoryIdForType(typeId: Long) = mappings.all().firstOrNull { it.typeId == typeId }?.categoryId
+    suspend fun categoryIdForType(typeId: Long): Long? = mappings.all().firstOrNull { it.typeId == typeId }?.categoryId
     suspend fun setTypeCategory(typeId: Long, categoryId: Long) = mappings.upsert(TypeCategoryEntity(typeId = typeId, categoryId = categoryId))
     suspend fun removeTypeCategory(typeId: Long) = mappings.deleteForType(typeId)
 
-    /** Seeds the predefined catalogue exactly once per missing value and creates the default type -> category mapping. */
+    /** Inserts only missing defaults, so user customizations are preserved. */
     suspend fun seedDefaults() {
-        val initial = linkedMapOf(
-            "AMAZON" to "E-COMMERCE", "ASOS" to "E-COMMERCE", "NETFLIX" to "E-COMMERCE", "ZALANDO" to "E-COMMERCE", "SPOTIFY" to "E-COMMERCE", "PULL&BEAR" to "E-COMMERCE", "H&M" to "E-COMMERCE", "PRENATAL" to "E-COMMERCE", "DISNEYPLUS" to "E-COMMERCE", "VARIE" to "E-COMMERCE", "ABBIGLIAMENTO" to "E-COMMERCE", "WILLIAM HILL" to "E-COMMERCE", "ZARA" to "E-COMMERCE", "PLAYSTATION" to "E-COMMERCE", "BARBIERE" to "E-COMMERCE", "RICARICA TIM" to "E-COMMERCE",
+        val defaults = listOf(
+            "AMAZON" to "E-COMMERCE", "ASOS" to "E-COMMERCE", "NETFLIX" to "E-COMMERCE", "ZALANDO" to "E-COMMERCE",
+            "SPOTIFY" to "E-COMMERCE", "PULL&BEAR" to "E-COMMERCE", "H&M" to "E-COMMERCE", "PRENATAL" to "E-COMMERCE",
+            "DISNEYPLUS" to "E-COMMERCE", "VARIE" to "E-COMMERCE", "ABBIGLIAMENTO" to "E-COMMERCE", "WILLIAM HILL" to "E-COMMERCE",
+            "ZARA" to "E-COMMERCE", "PLAYSTATION" to "E-COMMERCE", "BARBIERE" to "E-COMMERCE", "RICARICA TIM" to "E-COMMERCE",
             "SPESA" to "CASA", "UTENZE" to "CASA", "CONDOMINIO" to "CASA", "MANUTENZIONE" to "CASA", "AFFITTO" to "CASA", "VACANZA" to "CASA",
             "BENZINA" to "AUTO", "ASSICURAZIONE" to "AUTO", "BOLLO" to "AUTO", "ACCESSORI" to "AUTO", "RATA" to "AUTO", "TAGLIANDO" to "AUTO", "TELEPASS" to "AUTO", "AUTOLAVAGGIO" to "AUTO",
-            "GINECOLOGO" to "MEDICO", "PEDIATRA" to "MEDICO", "ANALISI" to "MEDICO", "FARMACIA" to "MEDICO", "RISTORANTE" to "PRANZO/CENA", "CINEMA" to "PRANZO/CENA", "MATERNA" to "SCUOLA", "ELEMENTARI" to "SCUOLA", "NUOTO" to "SPORT", "GINNASTICA" to "SPORT", "DANZA" to "SPORT", "STIPENDIO" to "NTT DATA", "BUONI PASTO" to "NTT DATA", "TREDICESIMA" to "NTT DATA", "INPS" to "INPS", "730" to "AGENZIA ENTRATE"
+            "GINECOLOGO" to "MEDICO", "PEDIATRA" to "MEDICO", "ANALISI" to "MEDICO", "FARMACIA" to "MEDICO",
+            "RISTORANTE" to "PRANZO/CENA", "CINEMA" to "PRANZO/CENA",
+            "MATERNA" to "SCUOLA", "ELEMENTARI" to "SCUOLA",
+            "NUOTO" to "SPORT", "GINNASTICA" to "SPORT", "DANZA" to "SPORT",
+            "STIPENDIO" to "NTT DATA", "BUONI PASTO" to "NTT DATA", "TREDICESIMA" to "NTT DATA",
+            "INPS" to "INPS", "730" to "AGENZIA ENTRATE"
         )
-        val typeMap = types.all().associateBy { it.name }.toMutableMap()
-        val categoryMap = categories.all().associateBy { it.name }.toMutableMap()
-        val mappingList = mappings.all().toMutableList()
-        initial.forEach { (typeName, categoryName) ->
-            val typeId = typeMap[typeName]?.id ?: types.insert(TypeEntity(name = typeName)).also { id -> typeMap[typeName] = TypeEntity(id = id, name = typeName) }
-            val categoryId = categoryMap[categoryName]?.id ?: categories.insert(CategoryEntity(name = categoryName)).also { id -> categoryMap[categoryName] = CategoryEntity(id = id, name = categoryName) }
-            if (mappingList.none { it.typeId == typeId }) {
+
+        val typeByName = types.all().associateBy { it.name }.toMutableMap()
+        val categoryByName = categories.all().associateBy { it.name }.toMutableMap()
+        val existingMappings = mappings.all().associateBy { it.typeId }.toMutableMap()
+
+        defaults.forEach { (typeName, categoryName) ->
+            val typeId = typeByName[typeName]?.id ?: types.insert(TypeEntity(name = typeName)).let { insertedId ->
+                require(insertedId > 0L) { "Unable to seed type $typeName" }
+                insertedId
+            }
+            if (!typeByName.containsKey(typeName)) {
+                typeByName[typeName] = TypeEntity(id = typeId, name = typeName)
+            }
+
+            val categoryId = categoryByName[categoryName]?.id ?: categories.insert(CategoryEntity(name = categoryName)).let { insertedId ->
+                require(insertedId > 0L) { "Unable to seed category $categoryName" }
+                insertedId
+            }
+            if (!categoryByName.containsKey(categoryName)) {
+                categoryByName[categoryName] = CategoryEntity(id = categoryId, name = categoryName)
+            }
+
+            if (!existingMappings.containsKey(typeId)) {
                 mappings.upsert(TypeCategoryEntity(typeId = typeId, categoryId = categoryId))
-                mappingList.add(TypeCategoryEntity(typeId = typeId, categoryId = categoryId))
+                existingMappings[typeId] = TypeCategoryEntity(typeId = typeId, categoryId = categoryId)
             }
         }
-        if (members.all().isEmpty()) listOf("Famiglia", "Papà", "Mamma", "Figlio 1", "Figlio 2").forEach { members.insert(FamilyMemberEntity(name = it)) }
+
+        if (members.all().isEmpty()) {
+            listOf("Famiglia", "Papà", "Mamma", "Figlio 1", "Figlio 2").forEach { members.insert(FamilyMemberEntity(name = it)) }
+        }
     }
 
     fun close() = db.close()
 }
 
-private fun MovementEntity.toModel() = Movement(id, if (type == MovementType.INCOME.name) MovementType.INCOME else MovementType.EXPENSE, amount, category, description, date, member, paymentMethod)
+private fun MovementEntity.toModel() = Movement(
+    id,
+    if (type == MovementType.INCOME.name) MovementType.INCOME else MovementType.EXPENSE,
+    amount,
+    category,
+    description,
+    date,
+    member,
+    paymentMethod
+)
+
 private fun Movement.toEntity() = MovementEntity(id, type.name, amount, category, description, date, member, paymentMethod)
