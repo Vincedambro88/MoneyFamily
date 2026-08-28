@@ -77,6 +77,7 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
   item{BarChartCard("Totali per componente",memberTotals)}
   item{BarChartCard("Totali per tipologia",typeTotals)}
   item{Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text("Riepilogo",style=MaterialTheme.typography.titleLarge);Text("Operazioni: ${cur.size}");Text("Spese: ${money.format(expense)}",color=NegativeColor);Text("Ricavi: ${money.format(income)}",color=PositiveColor);Text("Saldo: ${money.format(balance)}",color=if(balance<0)NegativeColor else PositiveColor)}}}
+  item{if(month.get(Calendar.MONTH)==Calendar.DECEMBER){OutlinedButton(onClick={annualPage=true},modifier=Modifier.fillMaxWidth()){Text("Riepilogo annuale ${month.get(Calendar.YEAR)}")}}}
   item{Button(onClick=add,modifier=Modifier.fillMaxWidth()){Text("+ Inserisci operazione")}}
  }}
 }
