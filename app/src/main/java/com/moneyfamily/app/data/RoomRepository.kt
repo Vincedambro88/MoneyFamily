@@ -18,29 +18,30 @@ class RoomRepository(context: Context) {
     suspend fun update(item: Movement) = dao.update(item.toEntity())
     suspend fun delete(item: Movement) = dao.delete(item.toEntity())
 
-    suspend fun allTypes() = types.all()
+    suspend fun allTypes(): List<TypeEntity> { seedDefaults(); return types.all() }
     suspend fun activeTypes() = types.active()
     suspend fun addType(name: String) = types.insert(TypeEntity(name = name.trim()))
     suspend fun updateType(item: TypeEntity) = types.update(item)
     suspend fun setTypeActive(id: Long, active: Boolean) = types.setActive(id, active)
 
-    suspend fun allCategories() = categories.all()
+    suspend fun allCategories(): List<CategoryEntity> { seedDefaults(); return categories.all() }
     suspend fun activeCategories() = categories.active()
     suspend fun addCategory(name: String) = categories.insert(CategoryEntity(name = name.trim()))
     suspend fun updateCategory(item: CategoryEntity) = categories.update(item)
     suspend fun setCategoryActive(id: Long, active: Boolean) = categories.setActive(id, active)
 
-    suspend fun allMembers() = members.all()
+    suspend fun allMembers(): List<FamilyMemberEntity> { seedDefaults(); return members.all() }
     suspend fun activeMembers() = members.active()
     suspend fun addMember(name: String) = members.insert(FamilyMemberEntity(name = name.trim()))
     suspend fun updateMember(item: FamilyMemberEntity) = members.update(item)
     suspend fun setMemberActive(id: Long, active: Boolean) = members.setActive(id, active)
 
-    suspend fun allMappings() = mappings.all()
+    suspend fun allMappings(): List<TypeCategoryEntity> { seedDefaults(); return mappings.all() }
     suspend fun categoryIdForType(typeId: Long) = mappings.all().firstOrNull { it.typeId == typeId }?.categoryId
     suspend fun setTypeCategory(typeId: Long, categoryId: Long) = mappings.upsert(TypeCategoryEntity(typeId = typeId, categoryId = categoryId))
     suspend fun removeTypeCategory(typeId: Long) = mappings.deleteForType(typeId)
 
+    /** Seeds the predefined catalogue exactly once per missing value and creates the default type -> category mapping. */
     suspend fun seedDefaults() {
         val initial = linkedMapOf(
             "AMAZON" to "E-COMMERCE", "ASOS" to "E-COMMERCE", "NETFLIX" to "E-COMMERCE", "ZALANDO" to "E-COMMERCE", "SPOTIFY" to "E-COMMERCE", "PULL&BEAR" to "E-COMMERCE", "H&M" to "E-COMMERCE", "PRENATAL" to "E-COMMERCE", "DISNEYPLUS" to "E-COMMERCE", "VARIE" to "E-COMMERCE", "ABBIGLIAMENTO" to "E-COMMERCE", "WILLIAM HILL" to "E-COMMERCE", "ZARA" to "E-COMMERCE", "PLAYSTATION" to "E-COMMERCE", "BARBIERE" to "E-COMMERCE", "RICARICA TIM" to "E-COMMERCE",
@@ -48,13 +49,15 @@ class RoomRepository(context: Context) {
             "BENZINA" to "AUTO", "ASSICURAZIONE" to "AUTO", "BOLLO" to "AUTO", "ACCESSORI" to "AUTO", "RATA" to "AUTO", "TAGLIANDO" to "AUTO", "TELEPASS" to "AUTO", "AUTOLAVAGGIO" to "AUTO",
             "GINECOLOGO" to "MEDICO", "PEDIATRA" to "MEDICO", "ANALISI" to "MEDICO", "FARMACIA" to "MEDICO", "RISTORANTE" to "PRANZO/CENA", "CINEMA" to "PRANZO/CENA", "MATERNA" to "SCUOLA", "ELEMENTARI" to "SCUOLA", "NUOTO" to "SPORT", "GINNASTICA" to "SPORT", "DANZA" to "SPORT", "STIPENDIO" to "NTT DATA", "BUONI PASTO" to "NTT DATA", "TREDICESIMA" to "NTT DATA", "INPS" to "INPS", "730" to "AGENZIA ENTRATE"
         )
-        val existingTypes = types.all().associateBy { it.name }
-        val existingCategories = categories.all().associateBy { it.name }
+        val typeMap = types.all().associateBy { it.name }.toMutableMap()
+        val categoryMap = categories.all().associateBy { it.name }.toMutableMap()
+        val mappingList = mappings.all().toMutableList()
         initial.forEach { (typeName, categoryName) ->
-            val typeId = existingTypes[typeName]?.id ?: types.insert(TypeEntity(name = typeName))
-            val categoryId = existingCategories[categoryName]?.id ?: categories.insert(CategoryEntity(name = categoryName))
-            if (typeId > 0 && categoryId > 0 && mappings.all().none { it.typeId == typeId }) {
+            val typeId = typeMap[typeName]?.id ?: types.insert(TypeEntity(name = typeName)).also { id -> typeMap[typeName] = TypeEntity(id = id, name = typeName) }
+            val categoryId = categoryMap[categoryName]?.id ?: categories.insert(CategoryEntity(name = categoryName)).also { id -> categoryMap[categoryName] = CategoryEntity(id = id, name = categoryName) }
+            if (mappingList.none { it.typeId == typeId }) {
                 mappings.upsert(TypeCategoryEntity(typeId = typeId, categoryId = categoryId))
+                mappingList.add(TypeCategoryEntity(typeId = typeId, categoryId = categoryId))
             }
         }
         if (members.all().isEmpty()) listOf("Famiglia", "Papà", "Mamma", "Figlio 1", "Figlio 2").forEach { members.insert(FamilyMemberEntity(name = it)) }
