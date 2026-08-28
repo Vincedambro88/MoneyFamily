@@ -17,8 +17,8 @@ dashboard = r'''@Composable private fun Dashboard(data:List<UiMovement>,month:Ca
  val catTotals=cur.groupBy{it.category.ifBlank{"Non classificata"}}.mapValues{(_,v)->v.sumOf{it.amount}}.filterValues{it!=0.0}.toList().sortedBy{it.second}
  val memberTotals=cur.groupBy{it.member.ifBlank{"Non assegnato"}}.mapValues{(_,v)->v.sumOf{it.amount}}.filterValues{it!=0.0}.toList().sortedByDescending{it.second}
  val typeTotals=cur.groupBy{it.typeName.takeIf{name->name.isNotBlank()&&!name.equals("EXPENSE",true)&&!name.equals("INCOME",true)}?:"Da classificare"}.mapValues{(_,v)->v.sumOf{it.amount}}.filterValues{it!=0.0}.toList().sortedBy{it.second}
- val goPrev={if(annualPage){annualPage=false}else{month.add(Calendar.MONTH,-1)}}
- val goNext={if(annualPage){month.add(Calendar.MONTH,1);annualPage=false}else if(month.get(Calendar.MONTH)==Calendar.DECEMBER){annualPage=true}else{month.add(Calendar.MONTH,1)}}
+ val goPrev={if(annualPage){annualPage=false}else{prev()}}
+ val goNext={if(annualPage){annualPage=false;next()}else if(month.get(Calendar.MONTH)==Calendar.DECEMBER){annualPage=true}else{next()}}
  if(annualPage){AnnualSummaryPage(data,month,goPrev,goNext,add)}else{LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
   item{MonthBar(mf.format(month.time),goPrev,goNext)}
   item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){MetricCard("Entrate",income,Modifier.weight(1f));MetricCard("Uscite",expense,Modifier.weight(1f));MetricCard("Saldo",balance,Modifier.weight(1f))}}
