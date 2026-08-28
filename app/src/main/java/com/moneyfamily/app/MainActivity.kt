@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.abs
 
 private val money = NumberFormat.getCurrencyInstance(Locale.ITALY)
 private val df = SimpleDateFormat("dd/MM/yyyy", Locale.ITALY)
@@ -34,7 +36,30 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
  MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={Text(t.take(1))},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,members,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true});1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)});2->Editor(null,types,cats,members,links,repo,{}){save(it);tab=1};3->Configuration(types,cats,members,links,repo){refresh()}}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
 }
 
-@Composable private fun Dashboard(data:List<UiMovement>,members:List<FamilyMemberEntity>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit){val cur=data.filter{same(it.date,month)};val income=cur.filter{it.amount>0}.sumOf{it.amount};val expense=cur.filter{it.amount<0}.sumOf{-it.amount};LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{MonthBar(mf.format(month.time),prev,next)};item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text("Dashboard mensile",style=MaterialTheme.typography.titleLarge);Text("Spese ${money.format(expense)}");Text("Ricavi ${money.format(income)}");Text("Saldo ${money.format(income-expense)}");Text("Operazioni ${cur.size}")}}};item{Text("Per componente",style=MaterialTheme.typography.titleLarge)};items(members){m->val e=cur.filter{it.member==m.name&&it.amount>0}.sumOf{it.amount};val s=cur.filter{it.member==m.name&&it.amount<0}.sumOf{-it.amount};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(m.name);Text(money.format(e-s))}};item{Text("Per categoria",style=MaterialTheme.typography.titleLarge)};items(cur.filter{it.amount<0}.groupBy{it.category}.entries.sortedByDescending{it.value.sumOf{-it.amount}}){e->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(e.key);Text(money.format(e.value.sumOf{-it.amount}))}};item{Button(onClick=add,modifier=Modifier.fillMaxWidth()){Text("+ Inserisci operazione")}}}}
+@Composable private fun Dashboard(data:List<UiMovement>,members:List<FamilyMemberEntity>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit){
+ val cur=data.filter{same(it.date,month)}
+ val income=cur.filter{it.amount>0}.sumOf{it.amount}
+ val expenses=cur.filter{it.amount<0}.sumOf{it.amount}
+ val balance=income+expenses
+ val expenseByCategory=cur.filter{it.amount<0}.groupBy{it.category}.mapValues{(_,v)->v.sumOf{it.amount}}.toList().sortedBy{it.second}
+ val memberBalance=members.map{m->m.name to cur.filter{it.member==m.name}.sumOf{it.amount}}.filter{it.second!=0.0}.sortedBy{it.second}
+ val maxCategory=expenseByCategory.minOfOrNull{abs(it.second)}?:0.0
+ val maxMember=memberBalance.maxOfOrNull{abs(it.second)}?:0.0
+ LazyColumn(Modifier.fillMaxSize().padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+  item{MonthBar(mf.format(month.time).replaceFirstChar{it.uppercase()},prev,next)}
+  item{Row(horizontalArrangement=Arrangement.spacedBy(10.dp),modifier=Modifier.fillMaxWidth()){MetricCard("Entrate",money.format(income),Modifier.weight(1f));MetricCard("Uscite",money.format(expenses),Modifier.weight(1f))}}
+  item{Row(horizontalArrangement=Arrangement.spacedBy(10.dp),modifier=Modifier.fillMaxWidth()){MetricCard("Saldo",money.format(balance),Modifier.weight(1f));MetricCard("Operazioni",cur.size.toString(),Modifier.weight(1f))}}
+  item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Text("Andamento del mese",style=MaterialTheme.typography.titleLarge);Text(if(balance>=0)"Il mese è in avanzo" else "Il mese è in disavanzo",style=MaterialTheme.typography.bodyMedium);BalanceBar(income,expenses)}}}
+  item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("Spese per categoria",style=MaterialTheme.typography.titleLarge);if(expenseByCategory.isEmpty())Text("Nessuna spesa nel mese");else expenseByCategory.take(8).forEach{(name,value)->DashboardBar(name,value,maxCategory)}}}}
+  item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("Saldo per componente",style=MaterialTheme.typography.titleLarge);if(memberBalance.isEmpty())Text("Nessun movimento nel mese");else memberBalance.forEach{(name,value)->DashboardBar(name,value,maxMember)}}}}
+  item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("Riepilogo",style=MaterialTheme.typography.titleLarge);Text("Entrate: ${money.format(income)}");Text("Uscite: ${money.format(expenses)}");Text("Saldo: ${money.format(balance)}");Text("Le uscite restano con segno negativo in tutte le aggregazioni.",style=MaterialTheme.typography.bodySmall)}}}
+  item{Button(onClick=add,modifier=Modifier.fillMaxWidth()){Text("+ Inserisci operazione")}}
+ }
+}
+
+@Composable private fun MetricCard(title:String,value:String,modifier:Modifier){Card(modifier){Column(Modifier.padding(14.dp)){Text(title,style=MaterialTheme.typography.labelLarge);Spacer(Modifier.height(4.dp));Text(value,style=MaterialTheme.typography.titleLarge)}}}
+@Composable private fun BalanceBar(income:Double,expenses:Double){val total=maxOf(income,abs(expenses),1.0);Column(verticalArrangement=Arrangement.spacedBy(4.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Entrate");Text(money.format(income))};LinearProgressIndicator(progress={(income/total).toFloat().coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth());Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Uscite");Text(money.format(expenses))};LinearProgressIndicator(progress={(abs(expenses)/total).toFloat().coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth())}}
+@Composable private fun DashboardBar(name:String,value:Double,maxValue:Double){val ratio=if(maxValue==0.0)0f else (abs(value)/maxValue).toFloat().coerceIn(0f,1f);Column{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(name);Text(money.format(value))};Canvas(Modifier.fillMaxWidth().height(10.dp)){drawRoundRect(size=size.copy(width=size.width*ratio),cornerRadius=androidx.compose.ui.geometry.CornerRadius(8f,8f))}}}
 
 @Composable private fun Operations(data:List<UiMovement>,types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,month:Calendar,prev:()->Unit,next:()->Unit,edit:(UiMovement)->Unit,remove:(UiMovement)->Unit){var q by remember{mutableStateOf("")};var type by remember{mutableStateOf("")};var cat by remember{mutableStateOf("")};var member by remember{mutableStateOf("")};var kind by remember{mutableStateOf("")};val filtered=data.filter{same(it.date,month)&&it.description.contains(q,true)&&(type.isBlank()||it.type.name==type)&&(cat.isBlank()||it.category==cat)&&(member.isBlank()||it.member==member)&&(kind.isBlank()||(kind=="Spese"&&it.amount<0)||(kind=="Ricavi"&&it.amount>0))};Column(Modifier.fillMaxSize().padding(16.dp)){MonthBar(mf.format(month.time),prev,next);OutlinedTextField(value=q,onValueChange={q=it},label={Text("Cerca descrizione")},modifier=Modifier.fillMaxWidth());Choice("Tipologia",type.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+types.map{it.name}){type=if(it=="Tutte")"" else it};Choice("Categoria",cat.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+cats.map{it.name}){cat=if(it=="Tutte")"" else it};Choice("Componente",member.ifBlank{"Tutti"},LocalContext.current,listOf("Tutti")+members.map{it.name}){member=if(it=="Tutti")"" else it};Choice("Tipo",kind.ifBlank{"Tutti"},LocalContext.current,listOf("Tutti","Spese","Ricavi")){kind=if(it=="Tutti")"" else it};LazyColumn(verticalArrangement=Arrangement.spacedBy(6.dp)){items(filtered.sortedByDescending{parse(it.date)?.timeInMillis?:0L}){x->Card(Modifier.fillMaxWidth()){Column(Modifier.padding(12.dp)){Text(x.description.ifBlank{x.type.name},style=MaterialTheme.typography.titleMedium);Text("${x.type} • ${x.category} • ${x.member} • ${x.date}");Text(money.format(x.amount));Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){TextButton(onClick={edit(x)}){Text("Modifica")};TextButton(onClick={remove(x)}){Text("Elimina")}}}}}}}}
 
