@@ -19,9 +19,9 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
-private val money=NumberFormat.getCurrencyInstance(Locale.ITALY)
-private val df=SimpleDateFormat("dd/MM/yyyy",Locale.ITALY)
-private val mf=SimpleDateFormat("MMMM yyyy",Locale.ITALIAN)
+private val money = NumberFormat.getCurrencyInstance(Locale.ITALY)
+private val df = SimpleDateFormat("dd/MM/yyyy", Locale.ITALY)
+private val mf = SimpleDateFormat("MMMM yyyy", Locale.ITALIAN)
 data class UiMovement(val id:Long,val type:MovementType,val amount:Double,val category:String,val description:String,val date:String,val member:String)
 class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.onCreate(s);setContent{MoneyFamilyApp()}}}
 
