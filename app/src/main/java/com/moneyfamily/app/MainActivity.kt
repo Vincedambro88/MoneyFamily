@@ -44,7 +44,23 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
 @Composable private fun EntityConfig(title:String,items:List<TypeEntity>,add:(String)->Unit){var name by remember{mutableStateOf("")};Column(verticalArrangement=Arrangement.spacedBy(8.dp)){items.forEach{Text(it.name)};OutlinedTextField(value=name,onValueChange={name=it},label={Text("Nuova $title")},modifier=Modifier.fillMaxWidth());Button(onClick={if(name.isNotBlank()){add(name);name=""}},modifier=Modifier.fillMaxWidth()){Text("Aggiungi")}}}
 @Composable private fun EntityConfig(title:String,items:List<CategoryEntity>,add:(String)->Unit){var name by remember{mutableStateOf("")};Column(verticalArrangement=Arrangement.spacedBy(8.dp)){items.forEach{Text(it.name)};OutlinedTextField(value=name,onValueChange={name=it},label={Text("Nuova $title")},modifier=Modifier.fillMaxWidth());Button(onClick={if(name.isNotBlank()){add(name);name=""}},modifier=Modifier.fillMaxWidth()){Text("Aggiungi")}}}
 @Composable private fun MemberConfig(items:List<FamilyMemberEntity>,repo:RoomRepository,refresh:()->Unit){var name by remember{mutableStateOf("")};Column(verticalArrangement=Arrangement.spacedBy(8.dp)){items.forEach{m->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(m.name);Text(if(m.active)"Attivo" else "Disattivo")}};OutlinedTextField(value=name,onValueChange={name=it},label={Text("Nuovo componente")},modifier=Modifier.fillMaxWidth());Button(onClick={if(name.isNotBlank()){repo.addMember(name);name="";refresh()}},modifier=Modifier.fillMaxWidth()){Text("Aggiungi")}}}
-@Composable private fun LinkConfig(types:List<TypeEntity>,cats:List<CategoryEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit){val c=LocalContext.current;LazyColumn{items(types.filter{it.active}){t->val current=cats.find{it.id==links.find{l->l.typeId==t.id}?.categoryId}?.name?:"Non associata";Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(t.name);TextButton(onClick={ChoiceDialog(c,"Categoria",cats.filter{it.active}.map{it.name}){n->cats.find{it.name==n}?.let{repo.setTypeCategory(t.id,it.id)};refresh()}}){Text(current)}}}}}}
+@Composable private fun LinkConfig(types:List<TypeEntity>,cats:List<CategoryEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit){
+    val c=LocalContext.current
+    LazyColumn {
+        items(types.filter{it.active}) { t ->
+            val current=cats.find{it.id==links.find{l->l.typeId==t.id}?.categoryId}?.name ?: "Non associata"
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                Text(t.name)
+                TextButton(onClick={
+                    ChoiceDialog(c,"Categoria",cats.filter{it.active}.map{it.name}) { n ->
+                        cats.find{it.name==n}?.let { cat -> repo.setTypeCategory(t.id,cat.id) }
+                        refresh()
+                    }
+                }) { Text(current) }
+            }
+        }
+    }
+}
 private fun ChoiceDialog(c:Context,title:String,opts:List<String>,pick:(String)->Unit){android.app.AlertDialog.Builder(c).setTitle(title).setItems(opts.toTypedArray()){_,i->pick(opts[i])}.show()}
 @Composable private fun Choice(label:String,value:String,c:Context,opts:List<String>,pick:(String)->Unit){OutlinedButton(onClick={ChoiceDialog(c,label,opts,pick)},modifier=Modifier.fillMaxWidth()){Text("$label: $value")}}
 @Composable private fun MonthBar(label:String,prev:()->Unit,next:()->Unit){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){OutlinedButton(onClick=prev){Text("‹")};Text(label,Modifier.padding(top=10.dp));OutlinedButton(onClick=next){Text("›")}}}
