@@ -6,6 +6,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -67,6 +69,7 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
  LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
   item{MonthBar(mf.format(month.time),prev,next)}
   item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){MetricCard("Entrate",income,Modifier.weight(1f));MetricCard("Uscite",expense,Modifier.weight(1f));MetricCard("Saldo",balance,Modifier.weight(1f))}}
+  item{AnnualSummaryCard(data,month)}
   item{AnnualSummaryCard(data,month)}
   item{PieChartCard("Composizione mensile",listOf("Entrate" to income,"Uscite" to expense))}
   item{BarChartCard("Totali per categoria",catTotals)}
