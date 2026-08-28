@@ -12,6 +12,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.moneyfamily.app.data.*
@@ -19,7 +22,7 @@ import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.abs
+import kotlin.math.min
 
 private val money = NumberFormat.getCurrencyInstance(Locale.ITALY)
 private val df = SimpleDateFormat("dd/MM/yyyy", Locale.ITALY)
@@ -37,29 +40,25 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
 }
 
 @Composable private fun Dashboard(data:List<UiMovement>,members:List<FamilyMemberEntity>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit){
- val cur=data.filter{same(it.date,month)}
- val income=cur.filter{it.amount>0}.sumOf{it.amount}
- val expenses=cur.filter{it.amount<0}.sumOf{it.amount}
- val balance=income+expenses
- val expenseByCategory=cur.filter{it.amount<0}.groupBy{it.category}.mapValues{(_,v)->v.sumOf{it.amount}}.toList().sortedBy{it.second}
- val memberBalance=members.map{m->m.name to cur.filter{it.member==m.name}.sumOf{it.amount}}.filter{it.second!=0.0}.sortedBy{it.second}
- val maxCategory=expenseByCategory.minOfOrNull{abs(it.second)}?:0.0
- val maxMember=memberBalance.maxOfOrNull{abs(it.second)}?:0.0
- LazyColumn(Modifier.fillMaxSize().padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-  item{MonthBar(mf.format(month.time).replaceFirstChar{it.uppercase()},prev,next)}
-  item{Row(horizontalArrangement=Arrangement.spacedBy(10.dp),modifier=Modifier.fillMaxWidth()){MetricCard("Entrate",money.format(income),Modifier.weight(1f));MetricCard("Uscite",money.format(expenses),Modifier.weight(1f))}}
-  item{Row(horizontalArrangement=Arrangement.spacedBy(10.dp),modifier=Modifier.fillMaxWidth()){MetricCard("Saldo",money.format(balance),Modifier.weight(1f));MetricCard("Operazioni",cur.size.toString(),Modifier.weight(1f))}}
-  item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Text("Andamento del mese",style=MaterialTheme.typography.titleLarge);Text(if(balance>=0)"Il mese è in avanzo" else "Il mese è in disavanzo",style=MaterialTheme.typography.bodyMedium);BalanceBar(income,expenses)}}}
-  item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("Spese per categoria",style=MaterialTheme.typography.titleLarge);if(expenseByCategory.isEmpty())Text("Nessuna spesa nel mese");else expenseByCategory.take(8).forEach{(name,value)->DashboardBar(name,value,maxCategory)}}}}
-  item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("Saldo per componente",style=MaterialTheme.typography.titleLarge);if(memberBalance.isEmpty())Text("Nessun movimento nel mese");else memberBalance.forEach{(name,value)->DashboardBar(name,value,maxMember)}}}}
-  item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("Riepilogo",style=MaterialTheme.typography.titleLarge);Text("Entrate: ${money.format(income)}");Text("Uscite: ${money.format(expenses)}");Text("Saldo: ${money.format(balance)}");Text("Le uscite restano con segno negativo in tutte le aggregazioni.",style=MaterialTheme.typography.bodySmall)}}}
+ val cur=data.filter{same(it.date,month)};val income=cur.filter{it.amount>0}.sumOf{it.amount};val expense=cur.filter{it.amount<0}.sumOf{it.amount};val balance=income+expense
+ val catTotals=cur.filter{it.amount<0}.groupBy{it.category}.mapValues{(_,v)->v.sumOf{it.amount}}.filterValues{it!=0.0}.toList().sortedBy{it.second}
+ val memberTotals=cur.groupBy{it.member}.mapValues{(_,v)->v.sumOf{it.amount}}.filterValues{it!=0.0}.toList().sortedByDescending{it.second}
+ val typeTotals=cur.groupBy{it.type.name}.mapValues{(_,v)->v.sumOf{it.amount}}.filterValues{it!=0.0}.toList().sortedBy{it.second}
+ LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+  item{MonthBar(mf.format(month.time),prev,next)}
+  item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){MetricCard("Entrate",income,true,Modifier.weight(1f));MetricCard("Uscite",expense,false,Modifier.weight(1f));MetricCard("Saldo",balance,null,Modifier.weight(1f))}}
+  item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(14.dp)){Text("Composizione mensile",style=MaterialTheme.typography.titleLarge);Text("Entrate vs uscite",style=MaterialTheme.typography.bodyMedium);Spacer(Modifier.height(8.dp));PieChart(income, -expense, Modifier.fillMaxWidth().height(190.dp));Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly){Text("Entrate ${money.format(income)}");Text("Uscite ${money.format(expense)}")}}}}
+  item{ChartCard("Spese per categoria",catTotals,negative=true)}
+  item{ChartCard("Saldo per componente",memberTotals,negative=false)}
+  item{ChartCard("Movimenti per tipologia",typeTotals,negative=false)}
+  item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(14.dp)){Text("Riepilogo",style=MaterialTheme.typography.titleLarge);Text("Operazioni: ${cur.size}");Text("Spese: ${money.format(expense)}");Text("Ricavi: ${money.format(income)}");Text("Saldo: ${money.format(balance)}")}}}
   item{Button(onClick=add,modifier=Modifier.fillMaxWidth()){Text("+ Inserisci operazione")}}
- }
-}
+ }}
 
-@Composable private fun MetricCard(title:String,value:String,modifier:Modifier){Card(modifier){Column(Modifier.padding(14.dp)){Text(title,style=MaterialTheme.typography.labelLarge);Spacer(Modifier.height(4.dp));Text(value,style=MaterialTheme.typography.titleLarge)}}}
-@Composable private fun BalanceBar(income:Double,expenses:Double){val total=maxOf(income,abs(expenses),1.0);Column(verticalArrangement=Arrangement.spacedBy(4.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Entrate");Text(money.format(income))};LinearProgressIndicator(progress={(income/total).toFloat().coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth());Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Uscite");Text(money.format(expenses))};LinearProgressIndicator(progress={(abs(expenses)/total).toFloat().coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth())}}
-@Composable private fun DashboardBar(name:String,value:Double,maxValue:Double){val ratio=if(maxValue==0.0)0f else (abs(value)/maxValue).toFloat().coerceIn(0f,1f);Column{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(name);Text(money.format(value))};Canvas(Modifier.fillMaxWidth().height(10.dp)){drawRoundRect(size=size.copy(width=size.width*ratio),cornerRadius=androidx.compose.ui.geometry.CornerRadius(8f,8f))}}}
+@Composable private fun MetricCard(title:String,value:Double,positive:Boolean?,modifier:Modifier){Card(modifier){Column(Modifier.padding(10.dp)){Text(title,style=MaterialTheme.typography.labelLarge);Text(money.format(value),style=MaterialTheme.typography.titleMedium)}}}
+@Composable private fun ChartCard(title:String,values:List<Pair<String,Double>>,negative:Boolean){Card(Modifier.fillMaxWidth()){Column(Modifier.padding(14.dp)){Text(title,style=MaterialTheme.typography.titleLarge);if(values.isEmpty())Text("Nessun dato per il mese");else{BarChart(values,Modifier.fillMaxWidth().height((min(260,80+values.size*42)).dp),negative);Spacer(Modifier.height(8.dp));values.take(8).forEach{(n,v)->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(n,Modifier.weight(1f));Text(money.format(v))}}}}}}
+@Composable private fun BarChart(values:List<Pair<String,Double>>,modifier:Modifier,negative:Boolean){Canvas(modifier){val maxAbs=values.maxOfOrNull{abs(it.second)}?.coerceAtLeast(1.0)?:1.0;val left=18f;val top=8f;val bottom=size.height-8f;val h=(bottom-top)/values.size;val barH=h*.58f;values.forEachIndexed{i,(name,v)->val y=top+i*h;val w=((abs(v)/maxAbs)*(size.width-left-20f)).toFloat();drawRect(brush=Brush.horizontalGradient(listOf(Color(0xFF4CAF50),Color(0xFF81C784))),topLeft=Offset(left,y),size=androidx.compose.ui.geometry.Size(w,barH));drawContext.canvas.nativeCanvas.drawText(name.take(14),left,y-2,android.graphics.Paint().apply{color=android.graphics.Color.DKGRAY;textSize=26f})}}}
+@Composable private fun PieChart(income:Double,expense:Double,modifier:Modifier){Canvas(modifier){val total=(income+expense).coerceAtLeast(0.01);val r=min(size.width,size.height)*.34f;val center=Offset(size.width/2,size.height/2);var start=-90f;val a=360f*(income/total);drawArc(Color(0xFF4CAF50),start,a,true);drawArc(Color(0xFFE57373),start+a,360f-a,true);drawCircle(Color.White,r*.42f,center);drawContext.canvas.nativeCanvas.drawText("${money.format(income+expense)}",center.x-65,center.y+8,android.graphics.Paint().apply{color=android.graphics.Color.DKGRAY;textSize=25f})}}
 
 @Composable private fun Operations(data:List<UiMovement>,types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,month:Calendar,prev:()->Unit,next:()->Unit,edit:(UiMovement)->Unit,remove:(UiMovement)->Unit){var q by remember{mutableStateOf("")};var type by remember{mutableStateOf("")};var cat by remember{mutableStateOf("")};var member by remember{mutableStateOf("")};var kind by remember{mutableStateOf("")};val filtered=data.filter{same(it.date,month)&&it.description.contains(q,true)&&(type.isBlank()||it.type.name==type)&&(cat.isBlank()||it.category==cat)&&(member.isBlank()||it.member==member)&&(kind.isBlank()||(kind=="Spese"&&it.amount<0)||(kind=="Ricavi"&&it.amount>0))};Column(Modifier.fillMaxSize().padding(16.dp)){MonthBar(mf.format(month.time),prev,next);OutlinedTextField(value=q,onValueChange={q=it},label={Text("Cerca descrizione")},modifier=Modifier.fillMaxWidth());Choice("Tipologia",type.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+types.map{it.name}){type=if(it=="Tutte")"" else it};Choice("Categoria",cat.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+cats.map{it.name}){cat=if(it=="Tutte")"" else it};Choice("Componente",member.ifBlank{"Tutti"},LocalContext.current,listOf("Tutti")+members.map{it.name}){member=if(it=="Tutti")"" else it};Choice("Tipo",kind.ifBlank{"Tutti"},LocalContext.current,listOf("Tutti","Spese","Ricavi")){kind=if(it=="Tutti")"" else it};LazyColumn(verticalArrangement=Arrangement.spacedBy(6.dp)){items(filtered.sortedByDescending{parse(it.date)?.timeInMillis?:0L}){x->Card(Modifier.fillMaxWidth()){Column(Modifier.padding(12.dp)){Text(x.description.ifBlank{x.type.name},style=MaterialTheme.typography.titleMedium);Text("${x.type} • ${x.category} • ${x.member} • ${x.date}");Text(money.format(x.amount));Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){TextButton(onClick={edit(x)}){Text("Modifica")};TextButton(onClick={remove(x)}){Text("Elimina")}}}}}}}}
 
@@ -78,3 +77,4 @@ private fun parse(s:String)=runCatching{df.parse(s)?.let{Calendar.getInstance().
 private fun same(s:String,c:Calendar):Boolean{val d=parse(s)?:return false;return d.get(Calendar.YEAR)==c.get(Calendar.YEAR)&&d.get(Calendar.MONTH)==c.get(Calendar.MONTH)}
 private fun Movement.ui()=UiMovement(id,type,amount,category,description,date,member)
 private fun UiMovement.model()=Movement(id,type,amount,category,description,date,member,"")
+private fun abs(v:Double)=kotlin.math.abs(v)
