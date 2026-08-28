@@ -14,6 +14,19 @@ android {
 
 kotlin { jvmToolchain(17) }
 
+// Keep the source resilient to an accidental duplicated import introduced by a patch.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    doFirst {
+        val source = file("src/main/java/com/moneyfamily/app/MainActivity.kt")
+        if (source.exists()) {
+            val text = source.readText()
+            val duplicate = "import androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts\nimport androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts"
+            val single = "import androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts"
+            if (text.contains(duplicate)) source.writeText(text.replace(duplicate, single))
+        }
+    }
+}
+
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.01.00"))
     implementation("androidx.activity:activity-compose:1.10.0")
