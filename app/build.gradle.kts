@@ -7,24 +7,11 @@ plugins {
 android {
     namespace = "com.moneyfamily.app"
     compileSdk = 35
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    defaultConfig {
-        applicationId = "com.moneyfamily.app"
-        minSdk = 26
-        targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
-    }
+    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    defaultConfig { applicationId = "com.moneyfamily.app"; minSdk = 26; targetSdk = 35; versionCode = 3; versionName = "1.3" }
 }
 
-kotlin {
-    jvmToolchain(17)
-}
+kotlin { jvmToolchain(17) }
 
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.01.00"))
@@ -33,4 +20,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
 }
