@@ -48,10 +48,14 @@ class RoomRepository(context: Context) {
             "BENZINA" to "AUTO", "ASSICURAZIONE" to "AUTO", "BOLLO" to "AUTO", "ACCESSORI" to "AUTO", "RATA" to "AUTO", "TAGLIANDO" to "AUTO", "TELEPASS" to "AUTO", "AUTOLAVAGGIO" to "AUTO",
             "GINECOLOGO" to "MEDICO", "PEDIATRA" to "MEDICO", "ANALISI" to "MEDICO", "FARMACIA" to "MEDICO", "RISTORANTE" to "PRANZO/CENA", "CINEMA" to "PRANZO/CENA", "MATERNA" to "SCUOLA", "ELEMENTARI" to "SCUOLA", "NUOTO" to "SPORT", "GINNASTICA" to "SPORT", "DANZA" to "SPORT", "STIPENDIO" to "NTT DATA", "BUONI PASTO" to "NTT DATA", "TREDICESIMA" to "NTT DATA", "INPS" to "INPS", "730" to "AGENZIA ENTRATE"
         )
+        val existingTypes = types.all().associateBy { it.name }
+        val existingCategories = categories.all().associateBy { it.name }
         initial.forEach { (typeName, categoryName) ->
-            val typeId = types.insert(TypeEntity(name = typeName)).let { if (it == -1L) types.all().firstOrNull { t -> t.name == typeName }?.id ?: 0L else it }
-            val categoryId = categories.insert(CategoryEntity(name = categoryName)).let { if (it == -1L) categories.all().firstOrNull { c -> c.name == categoryName }?.id ?: 0L else it }
-            if (typeId > 0 && categoryId > 0) mappings.upsert(TypeCategoryEntity(typeId = typeId, categoryId = categoryId))
+            val typeId = existingTypes[typeName]?.id ?: types.insert(TypeEntity(name = typeName))
+            val categoryId = existingCategories[categoryName]?.id ?: categories.insert(CategoryEntity(name = categoryName))
+            if (typeId > 0 && categoryId > 0 && mappings.all().none { it.typeId == typeId }) {
+                mappings.upsert(TypeCategoryEntity(typeId = typeId, categoryId = categoryId))
+            }
         }
         if (members.all().isEmpty()) listOf("Famiglia", "Papà", "Mamma", "Figlio 1", "Figlio 2").forEach { members.insert(FamilyMemberEntity(name = it)) }
     }
