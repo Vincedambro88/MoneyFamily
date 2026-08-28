@@ -6,7 +6,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,8 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -30,7 +27,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,29 +48,18 @@ import java.util.Locale
 private const val PREFS = "moneyfamily_data"
 private const val EXPENSES_KEY = "expenses"
 private const val MEMBERS_KEY = "members"
-private const val BUDGET_KEY = "budget"
-
+private const val BUDGETS_KEY = "monthly_budgets"
+private const val LEGACY_BUDGET_KEY = "budget"
 private val CATEGORIES = listOf("Alimentari", "Casa", "Auto", "Bollette", "Salute", "Figli", "Istruzione", "Abbigliamento", "Tempo libero", "Vacanze", "Sport", "Altro")
 private val PAYMENT_METHODS = listOf("Contanti", "Carta", "Bonifico", "Addebito", "Altro")
-private val moneyFormat = NumberFormat.getCurrencyInstance(Locale.ITALY)
+private val money = NumberFormat.getCurrencyInstance(Locale.ITALY)
 private val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.ITALY)
 private val monthFormat = SimpleDateFormat("MMMM yyyy", Locale.ITALIAN)
 
-private data class Expense(
-    val id: Long,
-    val amount: Double,
-    val category: String,
-    val description: String,
-    val date: String,
-    val member: String,
-    val paymentMethod: String
-)
+data class Expense(val id: Long, val amount: Double, val category: String, val description: String, val date: String, val member: String, val paymentMethod: String)
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent { MoneyFamilyApp() }
-    }
+    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { MoneyFamilyApp() } }
 }
 
 @Composable
@@ -83,441 +68,119 @@ private fun MoneyFamilyApp() {
     val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     var expenses by remember { mutableStateOf(loadExpenses(prefs)) }
     var members by remember { mutableStateOf(loadMembers(prefs).ifEmpty { listOf("Famiglia", "Papà", "Mamma", "Figlio 1", "Figlio 2") }) }
-    var budget by remember { mutableStateOf(prefs.getFloat(BUDGET_KEY, 3000f).toDouble()) }
-    var selectedMonth by remember { mutableStateOf(Calendar.getInstance()) }
+    var month by remember { mutableStateOf(Calendar.getInstance()) }
     var tab by remember { mutableStateOf(0) }
-    var editorOpen by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Expense?>(null) }
-
+    var editor by remember { mutableStateOf(false) }
     if (loadMembers(prefs).isEmpty()) saveMembers(prefs, members)
-
-    val monthExpenses = expenses.filter { sameMonth(it.date, selectedMonth) }
+    val monthExpenses = expenses.filter { sameMonth(it.date, month) }
     val total = monthExpenses.sumOf { it.amount }
-    val monthLabel = monthFormat.format(selectedMonth.time).replaceFirstChar { it.uppercase() }
+    val budget = loadBudget(prefs, month)
+    val label = monthFormat.format(month.time).replaceFirstChar { it.uppercase() }
 
     MaterialTheme {
-        Scaffold(
-            bottomBar = {
-                NavigationBar {
-                    val labels = listOf("Home", "Spese", "Budget", "Impostazioni")
-                    labels.forEachIndexed { index, label ->
-                        NavigationBarItem(
-                            selected = tab == index,
-                            onClick = { tab = index },
-                            icon = { Text(label.take(1)) },
-                            label = { Text(label) }
-                        )
-                    }
+        Scaffold(bottomBar = {
+            NavigationBar {
+                listOf("Home", "Spese", "Budget", "Impostazioni").forEachIndexed { i, title ->
+                    NavigationBarItem(selected = tab == i, onClick = { tab = i }, icon = { Text(title.take(1)) }, label = { Text(title) })
                 }
             }
-        ) { padding ->
+        }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
-                Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
-                    Text("MoneyFamily", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(16.dp))
-                }
+                Text("MoneyFamily", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(16.dp))
                 when (tab) {
-                    0 -> Dashboard(
-                        monthLabel = monthLabel,
-                        total = total,
-                        budget = budget,
-                        expenses = monthExpenses,
-                        members = members,
-                        onPrevious = { selectedMonth = previousMonth(selectedMonth) },
-                        onNext = { selectedMonth = nextMonth(selectedMonth) },
-                        onAdd = { editing = null; editorOpen = true }
-                    )
-                    1 -> ExpenseHistory(
-                        monthLabel = monthLabel,
-                        expenses = monthExpenses,
-                        onPrevious = { selectedMonth = previousMonth(selectedMonth) },
-                        onNext = { selectedMonth = nextMonth(selectedMonth) },
-                        onEdit = { editing = it; editorOpen = true },
-                        onDelete = {
-                            expenses = expenses.filterNot { e -> e.id == it.id }
-                            saveExpenses(prefs, expenses)
-                        }
-                    )
-                    2 -> BudgetScreen(
-                        monthLabel = monthLabel,
-                        total = total,
-                        budget = budget,
-                        onSave = {
-                            budget = it
-                            prefs.edit().putFloat(BUDGET_KEY, it.toFloat()).apply()
-                        }
-                    )
-                    else -> SettingsScreen(
-                        members = members,
-                        onAdd = {
-                            val value = it.trim()
-                            if (value.isNotEmpty() && !members.contains(value)) {
-                                members = members + value
-                                saveMembers(prefs, members)
-                            }
-                        },
-                        onRemove = {
-                            if (members.size > 1) {
-                                members = members.filterNot { m -> m == it }
-                                saveMembers(prefs, members)
-                            }
-                        }
-                    )
+                    0 -> Dashboard(label, total, budget, monthExpenses, members, { month = previousMonth(month) }, { month = nextMonth(month) }, { editing = null; editor = true })
+                    1 -> History(label, monthExpenses, { month = previousMonth(month) }, { month = nextMonth(month) }, { editing = it; editor = true }, { item -> expenses = expenses.filterNot { it.id == item.id }; saveExpenses(prefs, expenses) })
+                    2 -> BudgetScreen(label, total, budget) { saveBudget(prefs, month, it) }
+                    else -> Settings(members, { value -> val clean = value.trim(); if (clean.isNotEmpty() && clean !in members) { members += clean; saveMembers(prefs, members) } }, { value -> if (members.size > 1) { members = members.filterNot { it == value }; saveMembers(prefs, members) } })
                 }
             }
         }
-
-        if (editorOpen) {
-            ExpenseEditor(
-                expense = editing,
-                members = members,
-                onDismiss = { editorOpen = false },
-                onSave = { value ->
-                    expenses = if (editing == null) {
-                        listOf(value) + expenses
-                    } else {
-                        expenses.map { e -> if (e.id == value.id) value else e }
-                    }
-                    saveExpenses(prefs, expenses)
-                    editorOpen = false
-                }
-            )
-        }
+        if (editor) ExpenseEditor(editing, members, { editor = false }, { item -> expenses = if (editing == null) listOf(item) + expenses else expenses.map { if (it.id == item.id) item else it }; saveExpenses(prefs, expenses); editor = false })
     }
 }
 
 @Composable
-private fun Dashboard(
-    monthLabel: String,
-    total: Double,
-    budget: Double,
-    expenses: List<Expense>,
-    members: List<String>,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onAdd: () -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item { MonthSelector(monthLabel, onPrevious, onNext) }
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Spese del mese", style = MaterialTheme.typography.titleMedium)
-                    Text(moneyFormat.format(total), style = MaterialTheme.typography.headlineMedium)
-                    Text("Budget: ${moneyFormat.format(budget)}")
-                    Text("Residuo: ${moneyFormat.format(budget - total)}")
-                    LinearProgressIndicator(
-                        progress = { if (budget > 0) (total / budget).coerceIn(0.0, 1.0).toFloat() else 0f },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-        item { Text("Spese per membro", style = MaterialTheme.typography.titleLarge) }
-        items(members) { member ->
-            val memberTotal = expenses.filter { it.member == member }.sumOf { it.amount }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(member)
-                Text(moneyFormat.format(memberTotal))
-            }
-        }
+private fun Dashboard(label: String, total: Double, budget: Double, expenses: List<Expense>, members: List<String>, previous: () -> Unit, next: () -> Unit, add: () -> Unit) {
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { MonthSelector(label, previous, next) }
+        item { Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { Text("Totale spese", style = MaterialTheme.typography.titleMedium); Text(money.format(total), style = MaterialTheme.typography.headlineMedium); Text("Budget: ${money.format(budget)}"); Text("Residuo: ${money.format(budget - total)}"); LinearProgressIndicator(progress = { if (budget > 0) (total / budget).coerceIn(0.0, 1.0).toFloat() else 0f }, Modifier.fillMaxWidth()) } } }
+        item { Text("Per categoria", style = MaterialTheme.typography.titleLarge) }
+        items(expenses.groupBy { it.category }.entries.sortedByDescending { it.value.sumOf(Expense::amount) }) { entry -> val value = entry.value.sumOf { it.amount }; val percent = if (total == 0.0) 0 else (value / total * 100).toInt(); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("${entry.key} ($percent%)"); Text(money.format(value)) } }
+        item { Text("Per membro", style = MaterialTheme.typography.titleLarge) }
+        items(members) { member -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(member); Text(money.format(expenses.filter { it.member == member }.sumOf { it.amount })) } }
         item { Text("Ultime spese", style = MaterialTheme.typography.titleLarge) }
-        if (expenses.isEmpty()) {
-            item { Text("Nessuna spesa per questo mese.") }
-        } else {
-            items(expenses.sortedByDescending { parseDate(it.date)?.timeInMillis ?: 0L }.take(5)) { ExpenseRow(it) }
-        }
-        item { OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text("Inserisci nuova spesa") } }
+        items(expenses.sortedByDescending { parseDate(it.date)?.timeInMillis ?: 0L }.take(5)) { ExpenseRow(it) }
+        item { OutlinedButton(onClick = add, Modifier.fillMaxWidth()) { Text("+ Inserisci spesa") } }
     }
 }
 
 @Composable
-private fun ExpenseHistory(
-    monthLabel: String,
-    expenses: List<Expense>,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onEdit: (Expense) -> Unit,
-    onDelete: (Expense) -> Unit
-) {
-    var pendingDelete by remember { mutableStateOf<Expense?>(null) }
+private fun History(label: String, expenses: List<Expense>, previous: () -> Unit, next: () -> Unit, edit: (Expense) -> Unit, delete: (Expense) -> Unit) {
+    var pending by remember { mutableStateOf<Expense?>(null) }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        MonthSelector(monthLabel, onPrevious, onNext)
-        Spacer(Modifier.height(12.dp))
-        if (expenses.isEmpty()) {
-            Text("Nessuna spesa per questo mese.")
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(expenses.sortedByDescending { parseDate(it.date)?.timeInMillis ?: 0L }) { expense ->
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(12.dp)) {
-                            ExpenseRow(expense)
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                TextButton(onClick = { onEdit(expense) }) { Text("Modifica") }
-                                TextButton(onClick = { pendingDelete = expense }) { Text("Elimina") }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        MonthSelector(label, previous, next); Spacer(Modifier.height(10.dp))
+        if (expenses.isEmpty()) Text("Nessuna spesa per questo mese.") else LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) { items(expenses.sortedByDescending { parseDate(it.date)?.timeInMillis ?: 0L }) { e -> Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { ExpenseRow(e); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton({ edit(e) }) { Text("Modifica") }; TextButton({ pending = e }) { Text("Elimina") } } } } } }
     }
-    pendingDelete?.let { expense ->
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text("Eliminare la spesa?") },
-            text = { Text("${expense.description.ifBlank { expense.category }} — ${moneyFormat.format(expense.amount)}") },
-            confirmButton = {
-                TextButton(onClick = { onDelete(expense); pendingDelete = null }) { Text("Elimina") }
-            },
-            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Annulla") } }
-        )
-    }
+    pending?.let { e -> AlertDialog(onDismissRequest = { pending = null }, title = { Text("Eliminare la spesa?") }, text = { Text("${e.description.ifBlank { e.category }} — ${money.format(e.amount)}") }, confirmButton = { TextButton({ delete(e); pending = null }) { Text("Elimina") } }, dismissButton = { TextButton({ pending = null }) { Text("Annulla") } }) }
 }
 
-@Composable
-private fun ExpenseRow(expense: Expense) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Column(Modifier.weight(1f)) {
-            Text(expense.description.ifBlank { expense.category }, style = MaterialTheme.typography.titleMedium)
-            Text("${expense.category} • ${expense.member} • ${expense.date}")
-            Text(expense.paymentMethod, style = MaterialTheme.typography.bodySmall)
-        }
-        Spacer(Modifier.width(8.dp))
-        Text(moneyFormat.format(expense.amount), style = MaterialTheme.typography.titleMedium)
-    }
-}
+@Composable private fun ExpenseRow(e: Expense) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Column(Modifier.weight(1f)) { Text(e.description.ifBlank { e.category }, style = MaterialTheme.typography.titleMedium); Text("${e.category} • ${e.member} • ${e.date}"); Text(e.paymentMethod, style = MaterialTheme.typography.bodySmall) }; Spacer(Modifier.width(8.dp)); Text(money.format(e.amount), style = MaterialTheme.typography.titleMedium) } }
 
 @Composable
-private fun BudgetScreen(monthLabel: String, total: Double, budget: Double, onSave: (Double) -> Unit) {
+private fun BudgetScreen(label: String, total: Double, budget: Double, save: (Double) -> Unit) {
     var value by remember(budget) { mutableStateOf(String.format(Locale.US, "%.2f", budget)) }
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Budget", style = MaterialTheme.typography.headlineSmall)
-        Text(monthLabel)
-        OutlinedTextField(
-            value = value,
-            onValueChange = { value = it },
-            label = { Text("Budget mensile (€)") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Button(
-            onClick = { value.replace(',', '.').toDoubleOrNull()?.takeIf { it >= 0 }?.let(onSave) },
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("Salva budget") }
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Utilizzato: ${moneyFormat.format(total)}")
-                Text("Disponibile: ${moneyFormat.format(budget - total)}")
-                LinearProgressIndicator(
-                    progress = { if (budget > 0) (total / budget).coerceIn(0.0, 1.0).toFloat() else 0f },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
+        MonthSelector(label, {}, {}); Text("Budget mensile", style = MaterialTheme.typography.headlineSmall)
+        OutlinedTextField(value, { value = it }, label = { Text("Budget (€)") }, modifier = Modifier.fillMaxWidth())
+        Button({ value.replace(',', '.').toDoubleOrNull()?.takeIf { it >= 0 }?.let(save) }, Modifier.fillMaxWidth()) { Text("Salva budget per questo mese") }
+        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("Speso: ${money.format(total)}"); Text("Residuo: ${money.format(budget - total)}"); LinearProgressIndicator(progress = { if (budget > 0) (total / budget).coerceIn(0.0, 1.0).toFloat() else 0f }, Modifier.fillMaxWidth()) } }
     }
 }
 
 @Composable
-private fun SettingsScreen(members: List<String>, onAdd: (String) -> Unit, onRemove: (String) -> Unit) {
-    var newMember by remember { mutableStateOf("") }
+private fun Settings(members: List<String>, add: (String) -> Unit, remove: (String) -> Unit) {
+    var value by remember { mutableStateOf("") }
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("Impostazioni", style = MaterialTheme.typography.headlineSmall) }
-        item { Text("Membri della famiglia", style = MaterialTheme.typography.titleLarge) }
-        items(members) { member ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(member)
-                if (members.size > 1) TextButton(onClick = { onRemove(member) }) { Text("Rimuovi") }
-            }
-        }
+        item { Text("Impostazioni", style = MaterialTheme.typography.headlineSmall); Text("Membri della famiglia", style = MaterialTheme.typography.titleLarge) }
+        items(members) { member -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(member); if (members.size > 1) TextButton({ remove(member) }) { Text("Rimuovi") } } }
         item { HorizontalDivider() }
-        item {
-            OutlinedTextField(
-                value = newMember,
-                onValueChange = { newMember = it },
-                label = { Text("Nuovo membro") },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-        item {
-            Button(onClick = { onAdd(newMember); newMember = "" }, modifier = Modifier.fillMaxWidth()) { Text("Aggiungi membro") }
-        }
-        item { Text("Categorie", style = MaterialTheme.typography.titleLarge) }
-        item { Text(CATEGORIES.joinToString(" • ")) }
-        item { Text("Metodi di pagamento", style = MaterialTheme.typography.titleLarge) }
-        item { Text(PAYMENT_METHODS.joinToString(" • ")) }
+        item { OutlinedTextField(value, { value = it }, label = { Text("Nuovo membro") }, modifier = Modifier.fillMaxWidth()) }
+        item { Button({ add(value); value = "" }, Modifier.fillMaxWidth()) { Text("Aggiungi membro") } }
+        item { Text("Categorie disponibili", style = MaterialTheme.typography.titleLarge); Text(CATEGORIES.joinToString(" • ")); Text("Metodi di pagamento", style = MaterialTheme.typography.titleLarge); Text(PAYMENT_METHODS.joinToString(" • ")) }
     }
 }
 
 @Composable
-private fun ExpenseEditor(expense: Expense?, members: List<String>, onDismiss: () -> Unit, onSave: (Expense) -> Unit) {
+private fun ExpenseEditor(expense: Expense?, members: List<String>, dismiss: () -> Unit, save: (Expense) -> Unit) {
     val context = LocalContext.current
-    var amount by remember(expense) { mutableStateOf(expense?.amount?.toString() ?: "") }
-    var category by remember(expense) { mutableStateOf(expense?.category ?: CATEGORIES.first()) }
-    var description by remember(expense) { mutableStateOf(expense?.description ?: "") }
-    var date by remember(expense) { mutableStateOf(expense?.date ?: dateFormat.format(Date())) }
-    var member by remember(expense) { mutableStateOf(expense?.member ?: members.firstOrNull().orEmpty()) }
-    var payment by remember(expense) { mutableStateOf(expense?.paymentMethod ?: PAYMENT_METHODS.first()) }
-    var categoryOpen by remember { mutableStateOf(false) }
-    var memberOpen by remember { mutableStateOf(false) }
-    var paymentOpen by remember { mutableStateOf(false) }
-    val parsedAmount = amount.replace(',', '.').toDoubleOrNull()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (expense == null) "Nuova spesa" else "Modifica spesa") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = amount,
-                    onValueChange = { amount = it },
-                    label = { Text("Importo (€)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Box(Modifier.fillMaxWidth()) {
-                    OutlinedButton(onClick = { categoryOpen = true }, modifier = Modifier.fillMaxWidth()) { Text("Categoria: $category") }
-                    DropdownMenu(expanded = categoryOpen, onDismissRequest = { categoryOpen = false }) {
-                        CATEGORIES.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option) },
-                                onClick = { category = option; categoryOpen = false }
-                            )
-                        }
-                    }
-                }
-                Box(Modifier.fillMaxWidth()) {
-                    OutlinedButton(onClick = { memberOpen = true }, modifier = Modifier.fillMaxWidth()) { Text("Membro: $member") }
-                    DropdownMenu(expanded = memberOpen, onDismissRequest = { memberOpen = false }) {
-                        members.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option) },
-                                onClick = { member = option; memberOpen = false }
-                            )
-                        }
-                    }
-                }
-                Box(Modifier.fillMaxWidth()) {
-                    OutlinedButton(onClick = { paymentOpen = true }, modifier = Modifier.fillMaxWidth()) { Text("Pagamento: $payment") }
-                    DropdownMenu(expanded = paymentOpen, onDismissRequest = { paymentOpen = false }) {
-                        PAYMENT_METHODS.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option) },
-                                onClick = { payment = option; paymentOpen = false }
-                            )
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Descrizione") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedButton(
-                    onClick = {
-                        val cal = parseDate(date) ?: Calendar.getInstance()
-                        DatePickerDialog(
-                            context,
-                            { _, year, month, day ->
-                                cal.set(year, month, day)
-                                date = dateFormat.format(cal.time)
-                            },
-                            cal.get(Calendar.YEAR),
-                            cal.get(Calendar.MONTH),
-                            cal.get(Calendar.DAY_OF_MONTH)
-                        ).show()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Data: $date") }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = parsedAmount != null && parsedAmount > 0,
-                onClick = {
-                    onSave(
-                        Expense(
-                            id = expense?.id ?: System.currentTimeMillis(),
-                            amount = parsedAmount ?: 0.0,
-                            category = category,
-                            description = description.trim(),
-                            date = date,
-                            member = member,
-                            paymentMethod = payment
-                        )
-                    )
-                }
-            ) { Text("Salva") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } }
-    )
+    var amount by remember(expense) { mutableStateOf(expense?.amount?.toString() ?: "") }; var category by remember(expense) { mutableStateOf(expense?.category ?: CATEGORIES.first()) }; var description by remember(expense) { mutableStateOf(expense?.description ?: "") }; var date by remember(expense) { mutableStateOf(expense?.date ?: dateFormat.format(Date())) }; var member by remember(expense) { mutableStateOf(expense?.member ?: members.firstOrNull().orEmpty()) }; var payment by remember(expense) { mutableStateOf(expense?.paymentMethod ?: PAYMENT_METHODS.first()) }
+    AlertDialog(onDismissRequest = dismiss, title = { Text(if (expense == null) "Nuova spesa" else "Modifica spesa") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(amount, { amount = it }, label = { Text("Importo (€)") }, modifier = Modifier.fillMaxWidth())
+        SelectButton("Categoria", category) { showOptions(context, CATEGORIES, category) { category = it } }
+        SelectButton("Membro", member) { showOptions(context, members, member) { member = it } }
+        SelectButton("Pagamento", payment) { showOptions(context, PAYMENT_METHODS, payment) { payment = it } }
+        OutlinedTextField(description, { description = it }, label = { Text("Descrizione") }, modifier = Modifier.fillMaxWidth())
+        OutlinedButton({ val cal = parseDate(date) ?: Calendar.getInstance(); DatePickerDialog(context, { _, y, m, d -> cal.set(y, m, d); date = dateFormat.format(cal.time) }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show() }, Modifier.fillMaxWidth()) { Text("Data: $date") }
+    } }, confirmButton = { TextButton(enabled = amount.replace(',', '.').toDoubleOrNull()?.let { it > 0 } == true, onClick = { save(Expense(expense?.id ?: System.currentTimeMillis(), amount.replace(',', '.').toDouble(), category, description.trim(), date, member, payment)) }) { Text("Salva") } }, dismissButton = { TextButton(dismiss) { Text("Annulla") } })
 }
 
-@Composable
-private fun MonthSelector(label: String, onPrevious: () -> Unit, onNext: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        OutlinedButton(onClick = onPrevious) { Text("‹") }
-        Surface(tonalElevation = 2.dp) { Text(label, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp), style = MaterialTheme.typography.titleMedium) }
-        OutlinedButton(onClick = onNext) { Text("›") }
-    }
+@Composable private fun SelectButton(label: String, value: String, onClick: () -> Unit) { OutlinedButton(onClick, Modifier.fillMaxWidth()) { Text("$label: $value") } }
+
+private fun showOptions(context: Context, options: List<String>, current: String, onSelected: (String) -> Unit) {
+    android.app.AlertDialog.Builder(context).setTitle("Seleziona").setSingleChoiceItems(options.toTypedArray(), options.indexOf(current).coerceAtLeast(0)) { dialog, which -> onSelected(options[which]); dialog.dismiss() }.setNegativeButton("Annulla", null).show()
 }
 
-private fun loadExpenses(prefs: android.content.SharedPreferences): List<Expense> = try {
-    val array = JSONArray(prefs.getString(EXPENSES_KEY, "[]"))
-    buildList {
-        for (i in 0 until array.length()) {
-            val o = array.getJSONObject(i)
-            add(
-                Expense(
-                    id = o.getLong("id"),
-                    amount = o.getDouble("amount"),
-                    category = o.optString("category", "Altro"),
-                    description = o.optString("description"),
-                    date = o.optString("date", dateFormat.format(Date())),
-                    member = o.optString("member", "Famiglia"),
-                    paymentMethod = o.optString("paymentMethod", "Carta")
-                )
-            )
-        }
-    }
-} catch (_: Exception) { emptyList() }
+@Composable private fun MonthSelector(label: String, previous: () -> Unit, next: () -> Unit) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { OutlinedButton(previous) { Text("‹") }; Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 10.dp)); OutlinedButton(next) { Text("›") } } }
 
-private fun saveExpenses(prefs: android.content.SharedPreferences, expenses: List<Expense>) {
-    val array = JSONArray()
-    expenses.forEach { e ->
-        array.put(JSONObject().apply {
-            put("id", e.id)
-            put("amount", e.amount)
-            put("category", e.category)
-            put("description", e.description)
-            put("date", e.date)
-            put("member", e.member)
-            put("paymentMethod", e.paymentMethod)
-        })
-    }
-    prefs.edit().putString(EXPENSES_KEY, array.toString()).apply()
-}
-
-private fun loadMembers(prefs: android.content.SharedPreferences): List<String> = try {
-    val array = JSONArray(prefs.getString(MEMBERS_KEY, "[]"))
-    List(array.length()) { array.getString(it) }
-} catch (_: Exception) { emptyList() }
-
-private fun saveMembers(prefs: android.content.SharedPreferences, members: List<String>) {
-    val array = JSONArray()
-    members.forEach { array.put(it) }
-    prefs.edit().putString(MEMBERS_KEY, array.toString()).apply()
-}
-
-private fun parseDate(value: String): Calendar? = try {
-    dateFormat.parse(value)?.let { parsed -> Calendar.getInstance().apply { time = parsed } }
-} catch (_: Exception) { null }
-
-private fun sameMonth(value: String, month: Calendar): Boolean {
-    val date = parseDate(value) ?: return false
-    return date.get(Calendar.YEAR) == month.get(Calendar.YEAR) && date.get(Calendar.MONTH) == month.get(Calendar.MONTH)
-}
-
-private fun previousMonth(source: Calendar): Calendar = (source.clone() as Calendar).apply { add(Calendar.MONTH, -1) }
-private fun nextMonth(source: Calendar): Calendar = (source.clone() as Calendar).apply { add(Calendar.MONTH, 1) }
+private fun loadExpenses(prefs: android.content.SharedPreferences): List<Expense> = try { val a = JSONArray(prefs.getString(EXPENSES_KEY, "[]")); buildList { for (i in 0 until a.length()) { val o = a.getJSONObject(i); add(Expense(o.getLong("id"), o.getDouble("amount"), o.optString("category", "Altro"), o.optString("description"), o.optString("date", dateFormat.format(Date())), o.optString("member", "Famiglia"), o.optString("paymentMethod", "Carta"))) } } } catch (_: Exception) { emptyList() }
+private fun saveExpenses(prefs: android.content.SharedPreferences, list: List<Expense>) { val a = JSONArray(); list.forEach { e -> a.put(JSONObject().apply { put("id", e.id); put("amount", e.amount); put("category", e.category); put("description", e.description); put("date", e.date); put("member", e.member); put("paymentMethod", e.paymentMethod) }) }; prefs.edit().putString(EXPENSES_KEY, a.toString()).apply() }
+private fun loadMembers(prefs: android.content.SharedPreferences): List<String> = try { val a = JSONArray(prefs.getString(MEMBERS_KEY, "[]")); List(a.length()) { a.getString(it) } } catch (_: Exception) { emptyList() }
+private fun saveMembers(prefs: android.content.SharedPreferences, list: List<String>) { val a = JSONArray(); list.forEach(a::put); prefs.edit().putString(MEMBERS_KEY, a.toString()).apply() }
+private fun budgetKey(month: Calendar) = String.format(Locale.US, "%04d-%02d", month.get(Calendar.YEAR), month.get(Calendar.MONTH) + 1)
+private fun loadBudget(prefs: android.content.SharedPreferences, month: Calendar): Double { val key = budgetKey(month); val raw = prefs.getString(BUDGETS_KEY, "") ?: ""; return raw.split(";").firstOrNull { it.startsWith("$key=") }?.substringAfter("=")?.toDoubleOrNull() ?: prefs.getFloat(LEGACY_BUDGET_KEY, 3000f).toDouble() }
+private fun saveBudget(prefs: android.content.SharedPreferences, month: Calendar, value: Double) { val key = budgetKey(month); val old = (prefs.getString(BUDGETS_KEY, "") ?: "").split(";").filter { it.isNotBlank() && !it.startsWith("$key=") }.toMutableList(); old.add("$key=$value"); prefs.edit().putString(BUDGETS_KEY, old.joinToString(";")).putFloat(LEGACY_BUDGET_KEY, value.toFloat()).apply() }
+private fun parseDate(value: String): Calendar? = try { dateFormat.parse(value)?.let { Calendar.getInstance().apply { time = it } } } catch (_: Exception) { null }
+private fun sameMonth(value: String, month: Calendar): Boolean { val d = parseDate(value) ?: return false; return d.get(Calendar.YEAR) == month.get(Calendar.YEAR) && d.get(Calendar.MONTH) == month.get(Calendar.MONTH) }
+private fun previousMonth(c: Calendar) = (c.clone() as Calendar).apply { add(Calendar.MONTH, -1) }
+private fun nextMonth(c: Calendar) = (c.clone() as Calendar).apply { add(Calendar.MONTH, 1) }
