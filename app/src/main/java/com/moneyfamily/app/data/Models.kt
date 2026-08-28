@@ -10,7 +10,8 @@ data class Movement(
     val description: String,
     val date: String,
     val member: String,
-    val paymentMethod: String
+    val paymentMethod: String,
+    val typeName: String = ""
 )
 
 data class Category(val name: String, val type: MovementType)
