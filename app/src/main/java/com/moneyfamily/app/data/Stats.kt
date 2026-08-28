@@ -1,13 +1,13 @@
 package com.moneyfamily.app.data
 
 data class MonthStats(val year: Int, val month: Int, val income: Double, val expense: Double) {
-    val balance: Double get() = income - expense
+    val balance: Double get() = income + expense
 }
 
 data class CategoryStats(val category: String, val amount: Double, val percentage: Double)
 
 data class MemberStats(val member: String, val income: Double, val expense: Double) {
-    val balance: Double get() = income - expense
+    val balance: Double get() = income + expense
 }
 
 fun List<Movement>.monthStats(): List<MonthStats> = groupBy {
@@ -16,17 +16,27 @@ fun List<Movement>.monthStats(): List<MonthStats> = groupBy {
 }.mapNotNull { (key, values) ->
     val year = key.first ?: return@mapNotNull null
     val month = key.second ?: return@mapNotNull null
-    MonthStats(year, month, values.filter { it.type == MovementType.INCOME }.sumOf { it.amount }, values.filter { it.type == MovementType.EXPENSE }.sumOf { it.amount })
+    MonthStats(
+        year,
+        month,
+        values.filter { it.type == MovementType.INCOME }.sumOf { it.amount },
+        values.filter { it.type == MovementType.EXPENSE }.sumOf { it.amount }
+    )
 }.sortedWith(compareByDescending<MonthStats> { it.year }.thenByDescending { it.month })
 
 fun List<Movement>.categoryStats(): List<CategoryStats> {
-    val total = filter { it.type == MovementType.EXPENSE }.sumOf { it.amount }
-    return filter { it.type == MovementType.EXPENSE }.groupBy { it.category }.map { (category, items) ->
+    val expenses = filter { it.type == MovementType.EXPENSE }
+    val totalAbs = expenses.sumOf { kotlin.math.abs(it.amount) }
+    return expenses.groupBy { it.category }.map { (category, items) ->
         val amount = items.sumOf { it.amount }
-        CategoryStats(category, amount, if (total > 0) amount * 100 / total else 0.0)
-    }.sortedByDescending { it.amount }
+        CategoryStats(category, amount, if (totalAbs > 0) kotlin.math.abs(amount) * 100 / totalAbs else 0.0)
+    }.sortedBy { it.amount }
 }
 
 fun List<Movement>.memberStats(): List<MemberStats> = groupBy { it.member }.map { (member, items) ->
-    MemberStats(member, items.filter { it.type == MovementType.INCOME }.sumOf { it.amount }, items.filter { it.type == MovementType.EXPENSE }.sumOf { it.amount })
-}.sortedByDescending { it.expense }
+    MemberStats(
+        member,
+        items.filter { it.type == MovementType.INCOME }.sumOf { it.amount },
+        items.filter { it.type == MovementType.EXPENSE }.sumOf { it.amount }
+    )
+}.sortedBy { it.expense }
