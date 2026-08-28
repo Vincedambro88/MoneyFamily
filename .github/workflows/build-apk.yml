@@ -6,7 +6,7 @@ on:
     branches: [ "main" ]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -34,6 +34,30 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+
+      - name: Fix dashboard source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/moneyfamily/app/MainActivity.kt')
+          s = p.read_text()
+          if 'import androidx.compose.ui.draw.clip' not in s:
+              s = s.replace('import androidx.compose.ui.Modifier\n', 'import androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.clip\n')
+          s = s.replace('values.maxOf{abs(it.second)}', 'values.maxOf{kotlin.math.abs(it.second)}')
+          s = s.replace('val fraction=(kotlin.math.abs(value)/maxAbs).toFloat()', 'val fraction=(kotlin.math.abs(value)/maxAbs).toFloat()')
+          p.write_text(s)
+          PY
+          git diff --check
+
+      - name: Persist source fix
+        run: |
+          if ! git diff --quiet -- app/src/main/java/com/moneyfamily/app/MainActivity.kt; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app/src/main/java/com/moneyfamily/app/MainActivity.kt
+            git commit -m "Fix dashboard chart compilation"
+            git push origin HEAD:main
+          fi
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
