@@ -10,8 +10,13 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         db.execSQL("CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1)")
         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_categories_name ON categories(name)")
         db.execSQL("CREATE TABLE IF NOT EXISTS family_members (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1)")
-        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_family_members_name ON family_members(name)")
         db.execSQL("CREATE TABLE IF NOT EXISTS type_category (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, typeId INTEGER NOT NULL, categoryId INTEGER NOT NULL)")
         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_type_category_typeId ON type_category(typeId)")
+    }
+}
+
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE movements ADD COLUMN typeName TEXT NOT NULL DEFAULT ''")
     }
 }
