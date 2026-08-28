@@ -1,3 +1,4 @@
+# MoneyFamily dashboard patcher - v2
 from pathlib import Path
 import re
 
@@ -67,7 +68,6 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
 
 '''
 s = s[:start] + new_dashboard + s[end:]
-
 s = s.replace('(type.isBlank()||it.type.name==type)', '(type.isBlank()||it.typeName==type)')
 s = s.replace('Text("${x.type} • ${x.category} • ${x.member} • ${x.date}")', 'Text("${x.typeName.ifBlank{"Non classificata"}} • ${x.category} • ${x.member} • ${x.date}")')
 s = s.replace('save(UiMovement(old?.id?:System.currentTimeMillis(),if(a<0)MovementType.EXPENSE else MovementType.INCOME,a,category,desc,date,member))', 'save(UiMovement(old?.id?:System.currentTimeMillis(),if(a<0)MovementType.EXPENSE else MovementType.INCOME,a,category,desc,date,member,type))')
@@ -75,6 +75,5 @@ s = s.replace('private fun Movement.ui()=UiMovement(id,type,amount,category,desc
 s = s.replace('private fun UiMovement.model()=Movement(id,type,amount,category,description,date,member,"")', 'private fun UiMovement.model()=Movement(id,type,amount,category,description,date,member,"",typeName)')
 s = s.replace('import androidx.compose.foundation.layout.*', 'import androidx.compose.foundation.layout.*\nimport androidx.compose.foundation.Canvas')
 s = s.replace('import androidx.compose.ui.unit.dp', 'import androidx.compose.ui.unit.dp\nimport kotlin.math.abs')
-
 p.write_text(s)
 print('patched MainActivity.kt')
