@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 data class MovementEntity(
     @PrimaryKey val id: Long,
     val type: String,
+    val typeName: String = "",
     val amount: Double,
     val category: String,
     val description: String,
