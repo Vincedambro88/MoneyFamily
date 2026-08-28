@@ -5,7 +5,7 @@ import androidx.room.Room
 
 class RoomRepository(context: Context) {
     private val db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "moneyfamily.db")
-        .addMigrations(MIGRATION_1_2)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
         .build()
     private val dao = db.movementDao()
     private val types = db.typeDao()
@@ -41,11 +41,6 @@ class RoomRepository(context: Context) {
     suspend fun setTypeCategory(typeId: Long, categoryId: Long) = mappings.upsert(TypeCategoryEntity(typeId = typeId, categoryId = categoryId))
     suspend fun removeTypeCategory(typeId: Long) = mappings.deleteForType(typeId)
 
-    /**
-     * Default catalogue requested for MoneyFamily.
-     * Each pair is TIPologia -> CATEGORIA. Missing values are inserted only once,
-     * while existing user-created/edited values are preserved.
-     */
     suspend fun seedDefaults() {
         val defaults = listOf(
             "AMAZON" to "E-COMMERCE", "ASOS" to "E-COMMERCE", "NETFLIX" to "E-COMMERCE", "ZALANDO" to "E-COMMERCE",
@@ -61,34 +56,26 @@ class RoomRepository(context: Context) {
             "STIPENDIO" to "NTT DATA", "BUONI PASTO" to "NTT DATA", "TREDICESIMA" to "NTT DATA",
             "INPS" to "INPS", "730" to "AGENZIA ENTRATE"
         )
-
         val typeByName = types.all().associateBy { it.name }.toMutableMap()
         val categoryByName = categories.all().associateBy { it.name }.toMutableMap()
         val mappingByType = mappings.all().associateBy { it.typeId }.toMutableMap()
-
         defaults.forEach { (typeName, categoryName) ->
             val typeId = typeByName[typeName]?.id ?: types.insert(TypeEntity(name = typeName)).also { insertedId ->
                 require(insertedId > 0L) { "Unable to seed type $typeName" }
                 typeByName[typeName] = TypeEntity(id = insertedId, name = typeName)
             }
-
             val categoryId = categoryByName[categoryName]?.id ?: categories.insert(CategoryEntity(name = categoryName)).also { insertedId ->
                 require(insertedId > 0L) { "Unable to seed category $categoryName" }
                 categoryByName[categoryName] = CategoryEntity(id = insertedId, name = categoryName)
             }
-
-            // Create the mapping when it is missing. Existing mappings remain editable by the user.
             if (!mappingByType.containsKey(typeId)) {
                 val mapping = TypeCategoryEntity(typeId = typeId, categoryId = categoryId)
                 mappings.upsert(mapping)
                 mappingByType[typeId] = mapping
             }
         }
-
         if (members.all().isEmpty()) {
-            listOf("Famiglia", "Papà", "Mamma", "Figlio 1", "Figlio 2").forEach {
-                members.insert(FamilyMemberEntity(name = it))
-            }
+            listOf("Famiglia", "Papà", "Mamma", "Figlio 1", "Figlio 2").forEach { members.insert(FamilyMemberEntity(name = it)) }
         }
     }
 
@@ -103,7 +90,8 @@ private fun MovementEntity.toModel() = Movement(
     description,
     date,
     member,
-    paymentMethod
+    paymentMethod,
+    typeName
 )
 
-private fun Movement.toEntity() = MovementEntity(id, type.name, amount, category, description, date, member, paymentMethod)
+private fun Movement.toEntity() = MovementEntity(id, type.name, typeName, amount, category, description, date, member, paymentMethod)
