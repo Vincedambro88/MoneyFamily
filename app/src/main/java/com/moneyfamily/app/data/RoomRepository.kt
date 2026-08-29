@@ -18,19 +18,21 @@ class RoomRepository(context: Context) {
     suspend fun update(item: Movement) = dao.update(item.toEntity())
     suspend fun delete(item: Movement) = dao.delete(item.toEntity())
 
-    suspend fun allTypes(): List<TypeEntity> { seedDefaults(); return types.all() }
+    // Configuration screens only expose active master data. Deactivation is the
+    // safe delete semantics because historical movements keep their stored names.
+    suspend fun allTypes(): List<TypeEntity> { seedDefaults(); return types.active() }
     suspend fun activeTypes(): List<TypeEntity> { seedDefaults(); return types.active() }
     suspend fun addType(name: String) = types.insert(TypeEntity(name = name.trim()))
     suspend fun updateType(item: TypeEntity) = types.update(item)
     suspend fun setTypeActive(id: Long, active: Boolean) = types.setActive(id, active)
 
-    suspend fun allCategories(): List<CategoryEntity> { seedDefaults(); return categories.all() }
+    suspend fun allCategories(): List<CategoryEntity> { seedDefaults(); return categories.active() }
     suspend fun activeCategories(): List<CategoryEntity> { seedDefaults(); return categories.active() }
     suspend fun addCategory(name: String) = categories.insert(CategoryEntity(name = name.trim()))
     suspend fun updateCategory(item: CategoryEntity) = categories.update(item)
     suspend fun setCategoryActive(id: Long, active: Boolean) = categories.setActive(id, active)
 
-    suspend fun allMembers(): List<FamilyMemberEntity> { seedDefaults(); return members.all() }
+    suspend fun allMembers(): List<FamilyMemberEntity> { seedDefaults(); return members.active() }
     suspend fun activeMembers(): List<FamilyMemberEntity> { seedDefaults(); return members.active() }
     suspend fun addMember(name: String) = members.insert(FamilyMemberEntity(name = name.trim()))
     suspend fun updateMember(item: FamilyMemberEntity) = members.update(item)
