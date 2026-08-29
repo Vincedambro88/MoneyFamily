@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# MoneyFamily settings master-data CRUD patch.
 main = Path('app/src/main/java/com/moneyfamily/app/MainActivity.kt')
 s = main.read_text()
 if 'private fun MasterDataCrud(' in s:
