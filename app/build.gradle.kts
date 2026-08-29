@@ -7,14 +7,13 @@ plugins {
 
 android {
     namespace = "com.moneyfamily.app"
-    compileSdk = 35
+    compileSdk = 36
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-    defaultConfig { applicationId = "com.moneyfamily.app"; minSdk = 26; targetSdk = 35; versionCode = 4; versionName = "1.4" }
+    defaultConfig { applicationId = "com.moneyfamily.app"; minSdk = 26; targetSdk = 36; versionCode = 5; versionName = "1.0.0" }
 }
 
 kotlin { jvmToolchain(17) }
 
-// Keep the source resilient to an accidental duplicated import introduced by a patch.
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     doFirst {
         val source = file("src/main/java/com/moneyfamily/app/MainActivity.kt")
