@@ -20,13 +20,12 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
         if (source.exists()) {
             var text = source.readText()
 
-            // Remove duplicate imports from the legacy source.
             val duplicate = "import androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts\nimport androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts"
             val single = "import androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts"
             text = text.replace(duplicate, single)
 
-            // Restore the original tabbed Settings screen so the Add fields remain
-            // available. Add a compact X delete action beside every master-data value.
+            // Restore the original tabbed Settings UI: it keeps the Add controls
+            // available while allowing each master-data list to expose a compact X.
             val configStart = text.indexOf("@Composable private fun Configuration(")
             val typesStart = text.indexOf("@Composable private fun EntityConfigTypes", configStart)
             if (configStart >= 0 && typesStart > configStart) {
@@ -53,20 +52,30 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
                 text = text.substring(0, configStart) + replacement + text.substring(typesStart)
             }
 
-            // Tipologie: keep the existing insertion field and add an X beside each value.
-            text = text.replace(
+            fun patchRange(startMarker:String, endMarker:String, old:String, new:String) {
+                val start = text.indexOf(startMarker)
+                val end = if (start >= 0) text.indexOf(endMarker, start) else -1
+                if (start >= 0 && end > start) {
+                    val block = text.substring(start, end)
+                    text = text.substring(0, start) + block.replace(old, new) + text.substring(end)
+                }
+            }
+
+            patchRange(
+                "@Composable private fun EntityConfigTypes",
+                "@Composable private fun EntityConfigCats",
                 "items.forEach{Text(it.name,modifier=Modifier.fillMaxWidth().padding(vertical=2.dp))};OutlinedTextField",
                 "items.forEach{item->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(item.name,Modifier.weight(1f));TextButton(onClick={scope.launch{repo.setTypeActive(item.id,false);refresh()}}){Text(\"✕\")}}};OutlinedTextField"
             )
-
-            // Categorie: keep the existing insertion field and add an X beside each value.
-            text = text.replace(
+            patchRange(
+                "@Composable private fun EntityConfigCats",
+                "@Composable private fun MemberConfig",
                 "items.forEach{Text(it.name,modifier=Modifier.fillMaxWidth().padding(vertical=2.dp))};OutlinedTextField",
                 "items.forEach{item->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(item.name,Modifier.weight(1f));TextButton(onClick={scope.launch{repo.setCategoryActive(item.id,false);refresh()}}){Text(\"✕\")}}};OutlinedTextField"
             )
-
-            // Family members: keep insertion enabled and add an X beside each member.
-            text = text.replace(
+            patchRange(
+                "@Composable private fun MemberConfig",
+                "@Composable private fun LinkConfig",
                 "items.forEach{m->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(m.name);Text(if(m.active)\"Attivo\" else \"Disattivo\")}};OutlinedTextField",
                 "items.forEach{m->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(m.name,Modifier.weight(1f));TextButton(onClick={scope.launch{repo.setMemberActive(m.id,false);refresh()}}){Text(\"✕\")}}};OutlinedTextField"
             )
