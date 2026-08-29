@@ -18,10 +18,43 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     doFirst {
         val source = file("src/main/java/com/moneyfamily/app/MainActivity.kt")
         if (source.exists()) {
-            val text = source.readText()
+            var text = source.readText()
+
+            // Keep the existing source intact, but remove duplicate imports.
             val duplicate = "import androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts\nimport androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts"
             val single = "import androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts"
-            if (text.contains(duplicate)) source.writeText(text.replace(duplicate, single))
+            text = text.replace(duplicate, single)
+
+            // The stable source contains an old tabbed Configuration block after
+            // the new master-data CRUD screen. Remove that duplicate UI so the
+            // three requested sections are presented in one vertically scrollable page.
+            val configStart = text.indexOf("@Composable private fun Configuration(")
+            val typesStart = text.indexOf("@Composable private fun EntityConfigTypes", configStart)
+            if (configStart >= 0 && typesStart > configStart) {
+                val replacement = """
+@Composable private fun Configuration(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit){
+    MasterDataCrud(types,cats,members,repo,refresh)
+}
+
+""".trimIndent()
+                text = text.substring(0, configStart) + replacement + text.substring(typesStart)
+            }
+
+            // Make the master-data page itself scrollable. This is important when
+            // the type list is long: Categories and Family Members must remain
+            // reachable below it instead of being pushed outside the viewport.
+            val crudStart = text.indexOf("@Composable private fun MasterDataCrud(")
+            val sectionStart = text.indexOf("@Composable private fun MasterDataSection", crudStart)
+            if (crudStart >= 0 && sectionStart > crudStart) {
+                val crudBlock = text.substring(crudStart, sectionStart)
+                val scrollableCrud = crudBlock.replace(
+                    "Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)){",
+                    "Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)){"
+                )
+                text = text.substring(0, crudStart) + scrollableCrud + text.substring(sectionStart)
+            }
+
+            source.writeText(text)
         }
     }
 }
