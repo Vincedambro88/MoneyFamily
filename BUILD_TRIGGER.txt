@@ -1,0 +1,1 @@
+MoneyFamily build trigger after settings CRUD patch.
