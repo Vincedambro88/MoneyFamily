@@ -197,7 +197,9 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
  if(showEditor)Editor(null,types,cats,members,links,repo,{showEditor=false}){save(it);showEditor=false}
 }
 
-@Composable private fun Configuration(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit){var section by remember{mutableStateOf(0)};Column(Modifier.fillMaxSize().padding(16.dp)){Text("Configurazione",style=MaterialTheme.typography.headlineSmall);Row(Modifier.fillMaxWidth()){listOf("Tipologie","Categorie","Famiglia","Associazioni").forEachIndexed{i,t->TextButton(onClick={section=i}){Text(t)}}};Box(Modifier.fillMaxWidth().weight(1f)){when(section){0->EntityConfigTypes("Tipologie",types,repo,refresh);1->EntityConfigCats("Categorie",cats,repo,refresh);2->MemberConfig(members,repo,refresh);3->LinkConfig(types,cats,links,repo,refresh)}}}}
+@Composable private fun Configuration(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit){
+ MasterDataCrud(types,cats,members,repo,refresh)
+var section by remember{mutableStateOf(0)};Column(Modifier.fillMaxSize().padding(16.dp)){Text("Configurazione",style=MaterialTheme.typography.headlineSmall);Row(Modifier.fillMaxWidth()){listOf("Tipologie","Categorie","Famiglia","Associazioni").forEachIndexed{i,t->TextButton(onClick={section=i}){Text(t)}}};Box(Modifier.fillMaxWidth().weight(1f)){when(section){0->EntityConfigTypes("Tipologie",types,repo,refresh);1->EntityConfigCats("Categorie",cats,repo,refresh);2->MemberConfig(members,repo,refresh);3->LinkConfig(types,cats,links,repo,refresh)}}}}
 @Composable private fun EntityConfigTypes(title:String,items:List<TypeEntity>,repo:RoomRepository,refresh:()->Unit){var name by remember{mutableStateOf("")};val scope=rememberCoroutineScope();Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){items.forEach{Text(it.name,modifier=Modifier.fillMaxWidth().padding(vertical=2.dp))};OutlinedTextField(value=name,onValueChange={name=it},label={Text("Nuova $title")},modifier=Modifier.fillMaxWidth());Button(onClick={if(name.isNotBlank()){val n=name.trim();name="";scope.launch{repo.addType(n);refresh()}}},modifier=Modifier.fillMaxWidth()){Text("Aggiungi")}}}
 @Composable private fun EntityConfigCats(title:String,items:List<CategoryEntity>,repo:RoomRepository,refresh:()->Unit){var name by remember{mutableStateOf("")};val scope=rememberCoroutineScope();Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){items.forEach{Text(it.name,modifier=Modifier.fillMaxWidth().padding(vertical=2.dp))};OutlinedTextField(value=name,onValueChange={name=it},label={Text("Nuova $title")},modifier=Modifier.fillMaxWidth());Button(onClick={if(name.isNotBlank()){val n=name.trim();name="";scope.launch{repo.addCategory(n);refresh()}}},modifier=Modifier.fillMaxWidth()){Text("Aggiungi")}}}
 @Composable private fun MemberConfig(items:List<FamilyMemberEntity>,repo:RoomRepository,refresh:()->Unit){var name by remember{mutableStateOf("")};val scope=rememberCoroutineScope();Column(verticalArrangement=Arrangement.spacedBy(8.dp)){items.forEach{m->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(m.name);Text(if(m.active)"Attivo" else "Disattivo")}};OutlinedTextField(value=name,onValueChange={name=it},label={Text("Nuovo componente")},modifier=Modifier.fillMaxWidth());Button(onClick={if(name.isNotBlank()){val n=name.trim();name="";scope.launch{repo.addMember(n);refresh()}}},modifier=Modifier.fillMaxWidth()){Text("Aggiungi")}}}
@@ -210,3 +212,29 @@ private fun parse(s:String)=runCatching{df.parse(s)?.let{Calendar.getInstance().
 private fun same(s:String,c:Calendar):Boolean{val d=parse(s)?:return false;return d.get(Calendar.YEAR)==c.get(Calendar.YEAR)&&d.get(Calendar.MONTH)==c.get(Calendar.MONTH)}
 private fun Movement.ui()=UiMovement(id,type,amount,category,description,date,member,typeName)
 private fun UiMovement.model()=Movement(id,type,amount,category,description,date,member,"",typeName)
+
+@Composable private fun MasterDataCrud(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,repo:RoomRepository,refresh:()->Unit){
+ var dialogKind by remember{mutableStateOf("")};var editId by remember{mutableStateOf(0L)};var editName by remember{mutableStateOf("")}
+ var deleteKind by remember{mutableStateOf("")};var deleteId by remember{mutableStateOf(0L)};var deleteName by remember{mutableStateOf("")}
+ val scope=rememberCoroutineScope()
+ fun openEdit(k:String,id:Long,n:String){dialogKind=k;editId=id;editName=n}
+ fun askDelete(k:String,id:Long,n:String){deleteKind=k;deleteId=id;deleteName=n}
+ Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)){
+  Text("Gestione anagrafiche",style=MaterialTheme.typography.headlineSmall)
+  Text("Modifica o disattiva tipologie, categorie e membri. Le operazioni storiche non vengono cancellate.",style=MaterialTheme.typography.bodyMedium)
+  MasterDataSection("Tipologie",types.map{Triple(it.id,it.name,it.active)},{openEdit("TYPE",it.first,it.second)},{askDelete("TYPE",it.first,it.second)})
+  MasterDataSection("Categorie",cats.map{Triple(it.id,it.name,it.active)},{openEdit("CATEGORY",it.first,it.second)},{askDelete("CATEGORY",it.first,it.second)})
+  MasterDataSection("Membri della famiglia",members.map{Triple(it.id,it.name,it.active)},{openEdit("MEMBER",it.first,it.second)},{askDelete("MEMBER",it.first,it.second)})
+ }
+ if(dialogKind.isNotBlank()) AlertDialog(onDismissRequest={dialogKind=""},title={Text("Modifica valore")},text={OutlinedTextField(value=editName,onValueChange={editName=it},label={Text("Nome")},singleLine=true)},confirmButton={TextButton(onClick={val n=editName.trim();if(n.isNotBlank())scope.launch{when(dialogKind){"TYPE"->repo.updateType(TypeEntity(editId,n,true));"CATEGORY"->repo.updateCategory(CategoryEntity(editId,n,true));"MEMBER"->repo.updateMember(FamilyMemberEntity(editId,n,true))};dialogKind="";refresh()}}){Text("Salva")}},dismissButton={TextButton(onClick={dialogKind=""}){Text("Annulla")}})
+ if(deleteKind.isNotBlank()) AlertDialog(onDismissRequest={deleteKind=""},title={Text("Disattiva valore")},text={Text("Vuoi disattivare \"$deleteName\"? Le operazioni storiche resteranno disponibili, ma il valore non sarà più proposto nei nuovi inserimenti.")},confirmButton={TextButton(onClick={scope.launch{when(deleteKind){"TYPE"->repo.setTypeActive(deleteId,false);"CATEGORY"->repo.setCategoryActive(deleteId,false);"MEMBER"->repo.setMemberActive(deleteId,false)};deleteKind="";refresh()}}){Text("Disattiva")}},dismissButton={TextButton(onClick={deleteKind=""}){Text("Annulla")}})
+}
+
+@Composable private fun MasterDataSection(title:String,items:List<Triple<Long,String,Boolean>>,onEdit:(Triple<Long,String,Boolean>)->Unit,onDelete:(Triple<Long,String,Boolean>)->Unit){
+ Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp)){Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+  Text(title,style=MaterialTheme.typography.titleLarge)
+  if(items.isEmpty())Text("Nessun valore")
+  items.forEach{item->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(item.second);if(!item.third)Text("Disattivato",style=MaterialTheme.typography.labelSmall)};TextButton(onClick={onEdit(item)}){Text("✏")};TextButton(onClick={onDelete(item)}){Text(if(item.third)"🗑" else "↻")}}}
+ }}
+}
+
