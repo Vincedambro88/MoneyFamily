@@ -44,6 +44,13 @@ class RoomRepository(context: Context) {
     suspend fun removeTypeCategory(typeId: Long) = mappings.deleteForType(typeId)
 
     suspend fun seedDefaults() {
+        // Keep the sample data generic. Existing installations are migrated in-place
+        // so the previously seeded employer-specific label is also replaced.
+        val existingNttCategory = categories.all().firstOrNull { it.name.equals("NTT DATA", true) }
+        val existingWorkCategory = categories.all().firstOrNull { it.name.equals("LAVORO", true) }
+        if (existingNttCategory != null && existingWorkCategory == null) {
+            categories.update(existingNttCategory.copy(name = "LAVORO"))
+        }
         val defaults = listOf(
             "AMAZON" to "E-COMMERCE", "ASOS" to "E-COMMERCE", "NETFLIX" to "E-COMMERCE", "ZALANDO" to "E-COMMERCE",
             "SPOTIFY" to "E-COMMERCE", "PULL&BEAR" to "E-COMMERCE", "H&M" to "E-COMMERCE", "PRENATAL" to "E-COMMERCE",
@@ -55,7 +62,7 @@ class RoomRepository(context: Context) {
             "RISTORANTE" to "PRANZO/CENA", "CINEMA" to "PRANZO/CENA",
             "MATERNA" to "SCUOLA", "ELEMENTARI" to "SCUOLA",
             "NUOTO" to "SPORT", "GINNASTICA" to "SPORT", "DANZA" to "SPORT",
-            "STIPENDIO" to "NTT DATA", "BUONI PASTO" to "NTT DATA", "TREDICESIMA" to "NTT DATA",
+            "STIPENDIO" to "LAVORO", "BUONI PASTO" to "LAVORO", "TREDICESIMA" to "LAVORO",
             "INPS" to "INPS", "730" to "AGENZIA ENTRATE"
         )
         val typeByName = types.all().associateBy { it.name }.toMutableMap()
