@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Configuration UI patch: tabbed master data and editable type/category associations.
 main = Path('app/src/main/java/com/moneyfamily/app/MainActivity.kt')
 s = main.read_text()
 start = s.find('@Composable private fun Configuration(')
@@ -89,11 +90,13 @@ replacement = r'''@Composable private fun Configuration(types:List<TypeEntity>,c
 
 @Composable private fun EditNameDialogV2(title:String,current:String,onSave:(String)->Unit){
  var value by remember(current){mutableStateOf(current)}
- AlertDialog(onDismissRequest={},title={Text(title)},text={OutlinedTextField(value=value,onValueChange={value=it},singleLine=true,label={Text("Nome")})},confirmButton={TextButton(onClick={val n=value.trim();if(n.isNotBlank())onSave(n))){Text("Salva")}},dismissButton={TextButton(onClick={}){Text("Annulla")}})
+ var open by remember{mutableStateOf(true)}
+ if(open) AlertDialog(onDismissRequest={open=false},title={Text(title)},text={OutlinedTextField(value=value,onValueChange={value=it},singleLine=true,label={Text("Nome")})},confirmButton={TextButton(onClick={val n=value.trim();if(n.isNotBlank()){open=false;onSave(n)}}){Text("Salva")}},dismissButton={TextButton(onClick={open=false}){Text("Annulla")}})
 }
 
 @Composable private fun ConfirmDeactivateV2(name:String,onConfirm:()->Unit){
- AlertDialog(onDismissRequest={},title={Text("Elimina valore")},text={Text("Vuoi eliminare/disattivare \"$name\"? Le operazioni storiche non verranno cancellate.")},confirmButton={TextButton(onClick=onConfirm){Text("Elimina")}},dismissButton={TextButton(onClick={}){Text("Annulla")}})
+ var open by remember{mutableStateOf(true)}
+ if(open) AlertDialog(onDismissRequest={open=false},title={Text("Elimina valore")},text={Text("Vuoi eliminare/disattivare \"$name\"? Le operazioni storiche non verranno cancellate.")},confirmButton={TextButton(onClick={open=false;onConfirm()}){Text("Elimina")}},dismissButton={TextButton(onClick={open=false}){Text("Annulla")}})
 }
 
 '''
