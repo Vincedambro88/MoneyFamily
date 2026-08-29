@@ -55,4 +55,4 @@ jobs:
             app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
-# Trigger a fresh build for the current release configuration.
+# Force build after LAVORO rename.
