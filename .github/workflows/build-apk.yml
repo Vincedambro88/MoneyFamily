@@ -54,3 +54,5 @@ jobs:
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+
+# Trigger a fresh build for the current release configuration.
