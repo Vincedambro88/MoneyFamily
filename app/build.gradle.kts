@@ -20,39 +20,56 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
         if (source.exists()) {
             var text = source.readText()
 
-            // Keep the existing source intact, but remove duplicate imports.
+            // Remove duplicate imports from the legacy source.
             val duplicate = "import androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts\nimport androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts"
             val single = "import androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts"
             text = text.replace(duplicate, single)
 
-            // The stable source contains an old tabbed Configuration block after
-            // the new master-data CRUD screen. Remove that duplicate UI so the
-            // three requested sections are presented in one vertically scrollable page.
+            // Restore the original tabbed Settings screen so the Add fields remain
+            // available. Add a compact X delete action beside every master-data value.
             val configStart = text.indexOf("@Composable private fun Configuration(")
             val typesStart = text.indexOf("@Composable private fun EntityConfigTypes", configStart)
             if (configStart >= 0 && typesStart > configStart) {
                 val replacement = """
 @Composable private fun Configuration(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit){
-    MasterDataCrud(types,cats,members,repo,refresh)
+    var section by remember{mutableStateOf(0)}
+    Column(Modifier.fillMaxSize().padding(16.dp)){
+        Text("Configurazione",style=MaterialTheme.typography.headlineSmall)
+        Row(Modifier.fillMaxWidth()){
+            listOf("Tipologie","Categorie","Famiglia","Associazioni").forEachIndexed{i,t->TextButton(onClick={section=i}){Text(t)}}
+        }
+        Box(Modifier.fillMaxWidth().weight(1f)){
+            when(section){
+                0->EntityConfigTypes("Tipologie",types,repo,refresh)
+                1->EntityConfigCats("Categorie",cats,repo,refresh)
+                2->MemberConfig(members,repo,refresh)
+                3->LinkConfig(types,cats,links,repo,refresh)
+            }
+        }
+    }
 }
 
 """.trimIndent()
                 text = text.substring(0, configStart) + replacement + text.substring(typesStart)
             }
 
-            // Make the master-data page itself scrollable. This is important when
-            // the type list is long: Categories and Family Members must remain
-            // reachable below it instead of being pushed outside the viewport.
-            val crudStart = text.indexOf("@Composable private fun MasterDataCrud(")
-            val sectionStart = text.indexOf("@Composable private fun MasterDataSection", crudStart)
-            if (crudStart >= 0 && sectionStart > crudStart) {
-                val crudBlock = text.substring(crudStart, sectionStart)
-                val scrollableCrud = crudBlock.replace(
-                    "Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)){",
-                    "Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)){"
-                )
-                text = text.substring(0, crudStart) + scrollableCrud + text.substring(sectionStart)
-            }
+            // Tipologie: keep the existing insertion field and add an X beside each value.
+            text = text.replace(
+                "items.forEach{Text(it.name,modifier=Modifier.fillMaxWidth().padding(vertical=2.dp))};OutlinedTextField",
+                "items.forEach{item->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(item.name,Modifier.weight(1f));TextButton(onClick={scope.launch{repo.setTypeActive(item.id,false);refresh()}}){Text(\"✕\")}}};OutlinedTextField"
+            )
+
+            // Categorie: keep the existing insertion field and add an X beside each value.
+            text = text.replace(
+                "items.forEach{Text(it.name,modifier=Modifier.fillMaxWidth().padding(vertical=2.dp))};OutlinedTextField",
+                "items.forEach{item->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(item.name,Modifier.weight(1f));TextButton(onClick={scope.launch{repo.setCategoryActive(item.id,false);refresh()}}){Text(\"✕\")}}};OutlinedTextField"
+            )
+
+            // Family members: keep insertion enabled and add an X beside each member.
+            text = text.replace(
+                "items.forEach{m->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(m.name);Text(if(m.active)\"Attivo\" else \"Disattivo\")}};OutlinedTextField",
+                "items.forEach{m->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(m.name,Modifier.weight(1f));TextButton(onClick={scope.launch{repo.setMemberActive(m.id,false);refresh()}}){Text(\"✕\")}}};OutlinedTextField"
+            )
 
             source.writeText(text)
         }
