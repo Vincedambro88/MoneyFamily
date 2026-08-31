@@ -6,6 +6,7 @@ on:
       - 'tools/patch_dashboard.py'
       - 'tools/patch_import_back.py'
       - 'tools/patch_summary_lists.py'
+      - '.github/workflows/apply-dashboard-patch.yml'
 
 permissions:
   contents: write
@@ -22,11 +23,25 @@ jobs:
         run: python3 tools/patch_import_back.py
       - name: Apply complete summary lists patch
         run: python3 tools/patch_summary_lists.py
+      - name: Force remove display limits
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/moneyfamily/app/MainActivity.kt')
+          s = p.read_text()
+          s2 = s.replace('nonZero.take(10).forEachIndexed{index,entry->','nonZero.forEachIndexed{index,entry->')
+          s2 = s2.replace('values.take(12).forEach{(n,v)->BarChartRow(n,v,maxAbs)}','values.forEach{(n,v)->BarChartRow(n,v,maxAbs)}')
+          if s2 == s:
+              print('No remaining display limits found')
+          else:
+              p.write_text(s2)
+              print('Removed all category/type display limits')
+          PY
       - name: Commit patches
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/src/main/java/com/moneyfamily/app/MainActivity.kt
           git diff --cached --quiet && exit 0
-          git commit -m "Show all moved categories and types"
+          git commit -m "Display all moved categories and types"
           git push
