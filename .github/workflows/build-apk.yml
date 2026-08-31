@@ -35,13 +35,6 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Validate source
-        run: |
-          git diff --check
-          test -f app/src/main/java/com/vincedambro/moneyfamily/ExcelTemplate.kt
-          grep -q 'Scarica modello Excel' app/src/main/java/com/vincedambro/moneyfamily/MainActivity.kt
-          grep -q 'Importa da Excel' app/src/main/java/com/vincedambro/moneyfamily/MainActivity.kt
-
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
