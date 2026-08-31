@@ -80,6 +80,22 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
                 "items.forEach{m->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(m.name,Modifier.weight(1f));TextButton(onClick={scope.launch{repo.setMemberActive(m.id,false);refresh()}}){Text(\"✕\")}}};OutlinedTextField"
             )
 
+            // Add an in-app Excel template download to the Insert screen.
+            val insertStart = text.indexOf("@Composable private fun InsertScreen(")
+            val configAfterInsert = text.indexOf("@Composable private fun Configuration(", insertStart)
+            if (insertStart >= 0 && configAfterInsert > insertStart) {
+                var block = text.substring(insertStart, configAfterInsert)
+                block = block.replace(
+                    "val context=LocalContext.current;val scope=rememberCoroutineScope();var status by remember{mutableStateOf(\"\")};var showEditor by remember{mutableStateOf(false)}",
+                    "val context=LocalContext.current;val scope=rememberCoroutineScope();var status by remember{mutableStateOf(\"\")};var showEditor by remember{mutableStateOf(false)}\n val templateLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\")){uri->if(uri!=null)scope.launch{runCatching{ExcelTemplateGenerator.write(context,uri);status=\"Modello Excel salvato\"}.onFailure{status=\"Errore salvataggio modello: ${it.message?:\"operazione non riuscita\"}\"}}}"
+                )
+                block = block.replace(
+                    "Button(onClick={showEditor=true},modifier=Modifier.fillMaxWidth()){Text(\"+ Nuova operazione\")}",
+                    "Button(onClick={showEditor=true},modifier=Modifier.fillMaxWidth()){Text(\"+ Nuova operazione\")}\n OutlinedButton(onClick={templateLauncher.launch(\"MoneyFamily_Modello_Importazione.xlsx\")},modifier=Modifier.fillMaxWidth()){Text(\"Scarica modello Excel\")}"
+                )
+                text = text.substring(0, insertStart) + block + text.substring(configAfterInsert)
+            }
+
             source.writeText(text)
         }
     }
