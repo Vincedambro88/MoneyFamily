@@ -54,7 +54,7 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
  DisposableEffect(Unit){onDispose{repo.close()}}
  fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh()}}
  fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh()}}
- MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={Text(t.take(1))},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true});1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)});2->InsertScreen(types,cats,members,links,repo,{save(it);tab=1});3->Configuration(types,cats,members,links,repo){refresh()}}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
+ MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={Text(t.take(1))},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true});1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()});3->Configuration(types,cats,members,links,repo){refresh()}}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
 }
 
 @Composable private fun Dashboard(data:List<UiMovement>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit){
@@ -189,11 +189,27 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
  }}
 }
 
-@Composable private fun InsertScreen(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,save:(UiMovement)->Unit){
+@Composable private fun InsertScreen(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,onBack:()->Unit,save:(UiMovement)->Unit,onImported:()->Unit){
  val context=LocalContext.current;val scope=rememberCoroutineScope();var status by remember{mutableStateOf("")};var showEditor by remember{mutableStateOf(false)}
- val launcher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->if(uri!=null)scope.launch{runCatching{val rows=ExcelImporter.import(context,uri);rows.forEachIndexed{idx,r->val te=types.firstOrNull{it.name.equals(r.typeName,true)};val mapped=if(r.category.isBlank())links.firstOrNull{it.typeId==te?.id}?.let{l->cats.firstOrNull{c->c.id==l.categoryId}?.name}.orEmpty() else r.category;repo.insert(Movement(id=System.currentTimeMillis()+idx,type=if(r.amount<0)MovementType.EXPENSE else MovementType.INCOME,amount=r.amount,category=mapped.ifBlank{cats.firstOrNull()?.name.orEmpty()},description=r.description,date=r.date,member=r.member.ifBlank{members.firstOrNull()?.name.orEmpty()},paymentMethod="",typeName=r.typeName))};status="Importate ${rows.size} operazioni"}.onFailure{status="Errore importazione: ${it.message?:"file non valido"}"}}}
+ val launcher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->if(uri!=null)scope.launch{runCatching{
+  val rows=ExcelImporter.import(context,uri)
+  rows.forEachIndexed{idx,r->
+   val te=types.firstOrNull{it.name.equals(r.typeName,true)}
+   val mapped=if(r.category.isBlank())links.firstOrNull{it.typeId==te?.id}?.let{l->cats.firstOrNull{c->c.id==l.categoryId}?.name}.orEmpty() else r.category
+   repo.insert(Movement(id=System.currentTimeMillis()+idx,type=if(r.amount<0)MovementType.EXPENSE else MovementType.INCOME,amount=r.amount,category=mapped.ifBlank{cats.firstOrNull()?.name.orEmpty()},description=r.description,date=r.date,member=r.member.ifBlank{members.firstOrNull()?.name.orEmpty()},paymentMethod="",typeName=r.typeName))
+  }
+  onImported()
+  status="Importate ${rows.size} operazioni"
+ }.onFailure{status="Errore importazione: ${it.message?:"file non valido"}"}}}
  val templateLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")){uri->if(uri!=null)scope.launch{runCatching{ExcelTemplate.write(context,uri);status="Modello Excel salvato"}.onFailure{status="Errore salvataggio: ${it.message?:"operazione non riuscita"}"}}}
- Column(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Text("Inserisci",style=MaterialTheme.typography.headlineSmall);Button(onClick={showEditor=true},modifier=Modifier.fillMaxWidth()){Text("+ Nuova operazione")};OutlinedButton(onClick={templateLauncher.launch("MoneyFamily_Modello_Importazione.xlsx")},modifier=Modifier.fillMaxWidth()){Text("Scarica modello Excel")};OutlinedButton(onClick={launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-excel","text/csv"))},modifier=Modifier.fillMaxWidth()){Text("Importa da Excel")};Text("Excel obbligatorio: Data | Importo | Tipologia | Categoria | Componente | Descrizione. Tutti i campi devono essere compilati.",style=MaterialTheme.typography.bodyMedium);if(status.isNotBlank())Text(status,color=if(status.startsWith("Errore"))NegativeColor else PositiveColor)}
+ Column(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
+  Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){TextButton(onClick=onBack){Text("← Indietro")};Spacer(Modifier.weight(1f));Text("Inserisci",style=MaterialTheme.typography.headlineSmall)}
+  Button(onClick={showEditor=true},modifier=Modifier.fillMaxWidth()){Text("+ Nuova operazione")}
+  OutlinedButton(onClick={templateLauncher.launch("MoneyFamily_Modello_Importazione.xlsx")},modifier=Modifier.fillMaxWidth()){Text("Scarica modello Excel")}
+  OutlinedButton(onClick={launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-excel","text/csv"))},modifier=Modifier.fillMaxWidth()){Text("Importa da Excel")}
+  Text("Excel obbligatorio: Data | Descrizione | Importo | Tipologia | Categoria | Membro famiglia. Non inserire Entrata/Uscita: la natura dell'operazione deriva dal segno dell'Importo.",style=MaterialTheme.typography.bodyMedium)
+  if(status.isNotBlank())Text(status,color=if(status.startsWith("Errore"))NegativeColor else PositiveColor)
+ }
  if(showEditor)Editor(null,types,cats,members,links,repo,{showEditor=false}){save(it);showEditor=false}
 }
 
