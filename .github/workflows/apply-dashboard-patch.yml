@@ -6,6 +6,7 @@ on:
       - 'tools/patch_dashboard.py'
       - 'tools/patch_import_back.py'
       - 'tools/patch_summary_lists.py'
+      - 'tools/patch_pie_legend_scroll.py'
       - '.github/workflows/apply-dashboard-patch.yml'
 
 permissions:
@@ -23,6 +24,8 @@ jobs:
         run: python3 tools/patch_import_back.py
       - name: Apply complete summary lists patch
         run: python3 tools/patch_summary_lists.py
+      - name: Make pie chart legends scrollable
+        run: python3 tools/patch_pie_legend_scroll.py
       - name: Force remove display limits
         run: |
           python3 - <<'PY'
@@ -31,11 +34,8 @@ jobs:
           s = p.read_text()
           s2 = s.replace('nonZero.take(10).forEachIndexed{index,entry->','nonZero.forEachIndexed{index,entry->')
           s2 = s2.replace('values.take(12).forEach{(n,v)->BarChartRow(n,v,maxAbs)}','values.forEach{(n,v)->BarChartRow(n,v,maxAbs)}')
-          if s2 == s:
-              print('No remaining display limits found')
-          else:
+          if s2 != s:
               p.write_text(s2)
-              print('Removed all category/type display limits')
           PY
       - name: Commit patches
         run: |
@@ -43,5 +43,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/src/main/java/com/moneyfamily/app/MainActivity.kt
           git diff --cached --quiet && exit 0
-          git commit -m "Display all moved categories and types"
+          git commit -m "Show all category and type summary entries"
           git push
