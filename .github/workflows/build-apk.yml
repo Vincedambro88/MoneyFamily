@@ -35,10 +35,16 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Apply source patches
+        run: |
+          python3 tools/fix_annual_month_labels.py
+          python3 tools/add_excel_template.py
+
       - name: Validate source
         run: |
           git diff --check
           grep -q 'verticalScroll(rememberScrollState())' app/src/main/java/com/moneyfamily/app/MainActivity.kt
+          grep -q 'Scarica modello Excel' app/src/main/java/com/moneyfamily/app/MainActivity.kt
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
