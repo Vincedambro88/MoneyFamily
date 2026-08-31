@@ -149,7 +149,7 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
       }
      }
      Spacer(Modifier.width(16.dp))
-     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)){
+     Column(Modifier.weight(1f).height(170.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
       nonZero.forEachIndexed{index,entry->
        val color=palette[index%palette.size]
        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
