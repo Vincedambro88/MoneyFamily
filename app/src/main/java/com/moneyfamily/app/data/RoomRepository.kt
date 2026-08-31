@@ -1,9 +1,6 @@
 package com.moneyfamily.app.data
 
-import android.app.Activity
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import androidx.room.Room
 
 class RoomRepository(private val context: Context) {
@@ -17,12 +14,7 @@ class RoomRepository(private val context: Context) {
     private val mappings = db.typeCategoryDao()
 
     suspend fun all(): List<Movement> = dao.getAll().map { it.toModel() }
-    suspend fun insert(item: Movement) {
-        dao.insert(item.toEntity())
-        if (ImportRefresh.consume()) {
-            Handler(Looper.getMainLooper()).postDelayed({ (context as? Activity)?.recreate() }, 250L)
-        }
-    }
+    suspend fun insert(item: Movement) = dao.insert(item.toEntity())
     suspend fun update(item: Movement) = dao.update(item.toEntity())
     suspend fun delete(item: Movement) = dao.delete(item.toEntity())
 
