@@ -1,10 +1,18 @@
 package com.moneyfamily.app
 
+import android.content.Context
+import android.net.Uri
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 object ExcelTemplate {
+    fun write(context: Context, uri: Uri) {
+        val output = context.contentResolver.openOutputStream(uri)
+            ?: error("Impossibile aprire il file di destinazione")
+        output.use { it.write(create()) }
+    }
+
     fun create(): ByteArray {
         val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zip ->
