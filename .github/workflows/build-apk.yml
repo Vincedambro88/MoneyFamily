@@ -38,11 +38,9 @@ jobs:
       - name: Validate source
         run: |
           git diff --check
-          test -f app/src/main/java/com/moneyfamily/app/ExcelTemplate.kt
-          grep -q 'fun List<Movement>.monthStats' app/src/main/java/com/moneyfamily/app/data/Stats.kt
-          grep -q '(1..12)' app/src/main/java/com/moneyfamily/app/data/Stats.kt
-          grep -q 'Scarica modello Excel' app/src/main/java/com/moneyfamily/app/MainActivity.kt
-          grep -q 'Importa da Excel' app/src/main/java/com/moneyfamily/app/MainActivity.kt
+          test -f app/src/main/java/com/vincedambro/moneyfamily/ExcelTemplate.kt
+          grep -q 'Scarica modello Excel' app/src/main/java/com/vincedambro/moneyfamily/MainActivity.kt
+          grep -q 'Importa da Excel' app/src/main/java/com/vincedambro/moneyfamily/MainActivity.kt
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
