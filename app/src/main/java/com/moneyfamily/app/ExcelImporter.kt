@@ -2,6 +2,7 @@ package com.moneyfamily.app
 
 import android.content.Context
 import android.net.Uri
+import com.moneyfamily.app.data.ImportRefresh
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.text.SimpleDateFormat
@@ -15,7 +16,9 @@ data class ImportedRow(val date:String,val amount:Double,val typeName:String,val
 object ExcelImporter {
     fun import(context:Context, uri:Uri):List<ImportedRow>{
         val mime=context.contentResolver.getType(uri).orEmpty()
-        return if(mime.contains("spreadsheet")||mime.contains("excel")||uri.toString().lowercase().endsWith(".xlsx")) readXlsx(context,uri) else readCsv(context,uri)
+        val rows = if(mime.contains("spreadsheet")||mime.contains("excel")||uri.toString().lowercase().endsWith(".xlsx")) readXlsx(context,uri) else readCsv(context,uri)
+        if(rows.isNotEmpty()) ImportRefresh.request()
+        return rows
     }
     private fun readCsv(context:Context,uri:Uri):List<ImportedRow>{
         context.contentResolver.openInputStream(uri).use{ins->
