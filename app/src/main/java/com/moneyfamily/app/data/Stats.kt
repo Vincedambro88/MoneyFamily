@@ -10,19 +10,31 @@ data class MemberStats(val member: String, val income: Double, val expense: Doub
     val balance: Double get() = income + expense
 }
 
-fun List<Movement>.monthStats(): List<MonthStats> = groupBy {
-    val parts = it.date.split("/")
-    if (parts.size == 3) parts[2].toIntOrNull() to parts[1].toIntOrNull() else null to null
-}.mapNotNull { (key, values) ->
-    val year = key.first ?: return@mapNotNull null
-    val month = key.second ?: return@mapNotNull null
-    MonthStats(
-        year,
-        month,
-        values.filter { it.type == MovementType.INCOME }.sumOf { it.amount },
-        values.filter { it.type == MovementType.EXPENSE }.sumOf { it.amount }
-    )
-}.sortedWith(compareByDescending<MonthStats> { it.year }.thenByDescending { it.month })
+private fun Movement.yearMonth(): Pair<Int, Int>? {
+    val parts = date.split("/")
+    if (parts.size != 3) return null
+    val year = parts[2].toIntOrNull() ?: return null
+    val month = parts[1].toIntOrNull() ?: return null
+    if (month !in 1..12) return null
+    return year to month
+}
+
+fun List<Movement>.monthStats(): List<MonthStats> {
+    val valid = mapNotNull { m -> m.yearMonth()?.let { it to m } }
+    if (valid.isEmpty()) return emptyList()
+    val years = valid.map { it.first.first }.distinct().sortedDescending()
+    return years.flatMap { year ->
+        (1..12).map { month ->
+            val values = valid.filter { it.first.first == year && it.first.second == month }.map { it.second }
+            MonthStats(
+                year,
+                month,
+                values.filter { it.type == MovementType.INCOME }.sumOf { it.amount },
+                values.filter { it.type == MovementType.EXPENSE }.sumOf { it.amount }
+            )
+        }
+    }
+}
 
 fun List<Movement>.categoryStats(): List<CategoryStats> {
     val expenses = filter { it.type == MovementType.EXPENSE }
