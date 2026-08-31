@@ -36,15 +36,14 @@ jobs:
           gradle-version: '8.9'
 
       - name: Apply source patches
-        run: |
-          python3 tools/fix_annual_month_labels.py
-          python3 tools/add_excel_template.py
+        run: python3 tools/fix_annual_month_labels.py
 
       - name: Validate source
         run: |
           git diff --check
           grep -q 'Scarica modello Excel' app/src/main/java/com/moneyfamily/app/MainActivity.kt
           grep -q 'Importa da Excel' app/src/main/java/com/moneyfamily/app/MainActivity.kt
+          grep -q 'set(Calendar.DAY_OF_MONTH,1)' app/src/main/java/com/moneyfamily/app/MainActivity.kt
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
@@ -60,5 +59,3 @@ jobs:
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
-
-# Build triggered by source updates.
