@@ -5,6 +5,7 @@ on:
     paths:
       - 'tools/patch_dashboard.py'
       - 'tools/patch_import_back.py'
+      - 'tools/patch_summary_lists.py'
 
 permissions:
   contents: write
@@ -19,11 +20,13 @@ jobs:
         run: python3 tools/patch_dashboard.py
       - name: Apply Excel import back patch
         run: python3 tools/patch_import_back.py
+      - name: Apply complete summary lists patch
+        run: python3 tools/patch_summary_lists.py
       - name: Commit patches
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/src/main/java/com/moneyfamily/app/MainActivity.kt
           git diff --cached --quiet && exit 0
-          git commit -m "Add back button to Excel import"
+          git commit -m "Show all moved categories and types"
           git push
