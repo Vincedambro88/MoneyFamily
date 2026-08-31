@@ -2,6 +2,8 @@ package com.moneyfamily.app.data
 
 import android.app.Activity
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import androidx.room.Room
 
 class RoomRepository(private val context: Context) {
@@ -18,16 +20,12 @@ class RoomRepository(private val context: Context) {
     suspend fun insert(item: Movement) {
         dao.insert(item.toEntity())
         if (ImportRefresh.consume()) {
-            (context as? Activity)?.runOnUiThread {
-                it.postDelayed({ (context as? Activity)?.recreate() }, 250L)
-            }
+            Handler(Looper.getMainLooper()).postDelayed({ (context as? Activity)?.recreate() }, 250L)
         }
     }
     suspend fun update(item: Movement) = dao.update(item.toEntity())
     suspend fun delete(item: Movement) = dao.delete(item.toEntity())
 
-    // Configuration screens only expose active master data. Deactivation is the
-    // safe delete semantics because historical movements keep their stored names.
     suspend fun allTypes(): List<TypeEntity> { seedDefaults(); return types.active() }
     suspend fun activeTypes(): List<TypeEntity> { seedDefaults(); return types.active() }
     suspend fun addType(name: String) = types.insert(TypeEntity(name = name.trim()))
