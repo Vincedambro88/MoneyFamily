@@ -1,9 +1,10 @@
 package com.moneyfamily.app.data
 
+import android.app.Activity
 import android.content.Context
 import androidx.room.Room
 
-class RoomRepository(context: Context) {
+class RoomRepository(private val context: Context) {
     private val db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "moneyfamily.db")
         .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
         .build()
@@ -14,7 +15,14 @@ class RoomRepository(context: Context) {
     private val mappings = db.typeCategoryDao()
 
     suspend fun all(): List<Movement> = dao.getAll().map { it.toModel() }
-    suspend fun insert(item: Movement) = dao.insert(item.toEntity())
+    suspend fun insert(item: Movement) {
+        dao.insert(item.toEntity())
+        if (ImportRefresh.consume()) {
+            (context as? Activity)?.runOnUiThread {
+                it.postDelayed({ (context as? Activity)?.recreate() }, 250L)
+            }
+        }
+    }
     suspend fun update(item: Movement) = dao.update(item.toEntity())
     suspend fun delete(item: Movement) = dao.delete(item.toEntity())
 
@@ -44,13 +52,9 @@ class RoomRepository(context: Context) {
     suspend fun removeTypeCategory(typeId: Long) = mappings.deleteForType(typeId)
 
     suspend fun seedDefaults() {
-        // Keep the sample data generic. Existing installations are migrated in-place
-        // so the previously seeded employer-specific label is also replaced.
         val existingNttCategory = categories.all().firstOrNull { it.name.equals("NTT DATA", true) }
         val existingWorkCategory = categories.all().firstOrNull { it.name.equals("LAVORO", true) }
-        if (existingNttCategory != null && existingWorkCategory == null) {
-            categories.update(existingNttCategory.copy(name = "LAVORO"))
-        }
+        if (existingNttCategory != null && existingWorkCategory == null) categories.update(existingNttCategory.copy(name = "LAVORO"))
         val defaults = listOf(
             "AMAZON" to "E-COMMERCE", "ASOS" to "E-COMMERCE", "NETFLIX" to "E-COMMERCE", "ZALANDO" to "E-COMMERCE",
             "SPOTIFY" to "E-COMMERCE", "PULL&BEAR" to "E-COMMERCE", "H&M" to "E-COMMERCE", "PRENATAL" to "E-COMMERCE",
@@ -69,38 +73,15 @@ class RoomRepository(context: Context) {
         val categoryByName = categories.all().associateBy { it.name }.toMutableMap()
         val mappingByType = mappings.all().associateBy { it.typeId }.toMutableMap()
         defaults.forEach { (typeName, categoryName) ->
-            val typeId = typeByName[typeName]?.id ?: types.insert(TypeEntity(name = typeName)).also { insertedId ->
-                require(insertedId > 0L) { "Unable to seed type $typeName" }
-                typeByName[typeName] = TypeEntity(id = insertedId, name = typeName)
-            }
-            val categoryId = categoryByName[categoryName]?.id ?: categories.insert(CategoryEntity(name = categoryName)).also { insertedId ->
-                require(insertedId > 0L) { "Unable to seed category $categoryName" }
-                categoryByName[categoryName] = CategoryEntity(id = insertedId, name = categoryName)
-            }
-            if (!mappingByType.containsKey(typeId)) {
-                val mapping = TypeCategoryEntity(typeId = typeId, categoryId = categoryId)
-                mappings.upsert(mapping)
-                mappingByType[typeId] = mapping
-            }
+            val typeId = typeByName[typeName]?.id ?: types.insert(TypeEntity(name = typeName)).also { insertedId -> require(insertedId > 0L) { "Unable to seed type $typeName" }; typeByName[typeName] = TypeEntity(id = insertedId, name = typeName) }
+            val categoryId = categoryByName[categoryName]?.id ?: categories.insert(CategoryEntity(name = categoryName)).also { insertedId -> require(insertedId > 0L) { "Unable to seed category $categoryName" }; categoryByName[categoryName] = CategoryEntity(id = insertedId, name = categoryName) }
+            if (!mappingByType.containsKey(typeId)) { val mapping = TypeCategoryEntity(typeId = typeId, categoryId = categoryId); mappings.upsert(mapping); mappingByType[typeId] = mapping }
         }
-        if (members.all().isEmpty()) {
-            listOf("Famiglia", "Papà", "Mamma", "Figlio 1", "Figlio 2").forEach { members.insert(FamilyMemberEntity(name = it)) }
-        }
+        if (members.all().isEmpty()) listOf("Famiglia", "Papà", "Mamma", "Figlio 1", "Figlio 2").forEach { members.insert(FamilyMemberEntity(name = it)) }
     }
 
     fun close() = db.close()
 }
 
-private fun MovementEntity.toModel() = Movement(
-    id,
-    if (type == MovementType.INCOME.name) MovementType.INCOME else MovementType.EXPENSE,
-    amount,
-    category,
-    description,
-    date,
-    member,
-    paymentMethod,
-    typeName
-)
-
+private fun MovementEntity.toModel() = Movement(id, if (type == MovementType.INCOME.name) MovementType.INCOME else MovementType.EXPENSE, amount, category, description, date, member, paymentMethod, typeName)
 private fun Movement.toEntity() = MovementEntity(id, type.name, typeName, amount, category, description, date, member, paymentMethod)
