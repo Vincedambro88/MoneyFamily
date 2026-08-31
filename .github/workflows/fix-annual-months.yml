@@ -1,0 +1,26 @@
+name: Fix Annual Month Labels
+
+on:
+  push:
+    paths:
+      - 'tools/fix_annual_month_labels.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Apply annual month label fix
+        run: python3 tools/fix_annual_month_labels.py
+      - name: Commit patched app
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/moneyfamily/app/MainActivity.kt
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix annual summary month labels"
+          git push
