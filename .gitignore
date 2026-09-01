@@ -1,0 +1,24 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# Local configuration
+local.properties
+
+# Android signing keys and encoded keystores
+*.jks
+*.keystore
+*.base64
+keystore.base64
+upload-keystore.jks
+
+# Kotlin
+.kotlin/
+
+# OS
+.DS_Store
