@@ -4,8 +4,8 @@
         android:shortcutId="backup_restore"
         android:enabled="true"
         android:icon="@drawable/ic_launcher"
-        android:shortcutShortLabel="Backup e ripristino"
-        android:shortcutLongLabel="Backup e ripristino dati">
+        android:shortcutShortLabel="@string/shortcut_backup_restore_short"
+        android:shortcutLongLabel="@string/shortcut_backup_restore_long">
         <intent
             android:action="android.intent.action.VIEW"
             android:targetPackage="com.moneyfamily.app"
