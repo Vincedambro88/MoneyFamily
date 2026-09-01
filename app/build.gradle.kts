@@ -9,7 +9,7 @@ android {
     namespace = "com.moneyfamily.app"
     compileSdk = 36
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-    defaultConfig { applicationId = "com.vdapps.moneyfamily"; minSdk = 26; targetSdk = 36; versionCode = 5; versionName = "1.0.0" }
+    defaultConfig { applicationId = "com.vdapps.moneyfamily"; minSdk = 26; targetSdk = 36; versionCode = 6; versionName = "1.0.1" }
 
     signingConfigs {
         create("release") {
