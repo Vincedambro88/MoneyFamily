@@ -1,0 +1,4 @@
+<resources>
+    <string name="shortcut_backup_restore_short">Backup e ripristino</string>
+    <string name="shortcut_backup_restore_long">Backup e ripristino dati</string>
+</resources>
