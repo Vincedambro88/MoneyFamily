@@ -2,6 +2,7 @@ package com.moneyfamily.app.data
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 
 class RoomRepository(private val context: Context) {
     private val db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "moneyfamily.db")
@@ -41,6 +42,29 @@ class RoomRepository(private val context: Context) {
     suspend fun setTypeCategory(typeId: Long, categoryId: Long) = mappings.upsert(TypeCategoryEntity(typeId = typeId, categoryId = categoryId))
     suspend fun removeTypeCategory(typeId: Long) = mappings.deleteForType(typeId)
 
+    suspend fun exportSnapshot(): MoneyFamilySnapshot = db.withTransaction {
+        MoneyFamilySnapshot(
+            movements = dao.getAll(),
+            types = types.all(),
+            categories = categories.all(),
+            members = members.all(),
+            mappings = mappings.all()
+        )
+    }
+
+    suspend fun restoreSnapshot(snapshot: MoneyFamilySnapshot) = db.withTransaction {
+        mappings.deleteAll()
+        dao.deleteAll()
+        types.deleteAll()
+        categories.deleteAll()
+        members.deleteAll()
+        types.insertAll(snapshot.types)
+        categories.insertAll(snapshot.categories)
+        members.insertAll(snapshot.members)
+        mappings.insertAll(snapshot.mappings)
+        dao.insertAll(snapshot.movements)
+    }
+
     suspend fun seedDefaults() {
         val existingNttCategory = categories.all().firstOrNull { it.name.equals("NTT DATA", true) }
         val existingWorkCategory = categories.all().firstOrNull { it.name.equals("LAVORO", true) }
@@ -72,6 +96,14 @@ class RoomRepository(private val context: Context) {
 
     fun close() = db.close()
 }
+
+data class MoneyFamilySnapshot(
+    val movements: List<MovementEntity>,
+    val types: List<TypeEntity>,
+    val categories: List<CategoryEntity>,
+    val members: List<FamilyMemberEntity>,
+    val mappings: List<TypeCategoryEntity>
+)
 
 private fun MovementEntity.toModel() = Movement(id, if (type == MovementType.INCOME.name) MovementType.INCOME else MovementType.EXPENSE, amount, category, description, date, member, paymentMethod, typeName)
 private fun Movement.toEntity() = MovementEntity(id, type.name, typeName, amount, category, description, date, member, paymentMethod)
