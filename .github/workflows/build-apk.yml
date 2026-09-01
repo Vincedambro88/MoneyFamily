@@ -1,4 +1,4 @@
-name: Build MoneyFamily APK
+name: Build MoneyFamily AAB
 
 on:
   workflow_dispatch:
@@ -52,9 +52,6 @@ jobs:
           keytool -list -keystore "$ANDROID_KEYSTORE_FILE" -storepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null
           echo "Keystore password validated successfully."
 
-      - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
-
       - name: Build signed release AAB
         env:
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/upload-keystore.jks
@@ -70,11 +67,14 @@ jobs:
           echo "Using keystore alias: $ANDROID_KEY_ALIAS"
           gradle --no-daemon bundleRelease
 
-      - name: Upload APK and AAB
+      - name: Verify AAB
+        run: |
+          test -s app/build/outputs/bundle/release/app-release.aab
+          ls -lh app/build/outputs/bundle/release/app-release.aab
+
+      - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: MoneyFamily-1.0.0
-          path: |
-            app/build/outputs/apk/debug/app-debug.apk
-            app/build/outputs/bundle/release/app-release.aab
+          name: MoneyFamily-release-AAB
+          path: app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
