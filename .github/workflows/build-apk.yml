@@ -43,6 +43,15 @@ jobs:
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload-keystore.jks"
           test -s "$RUNNER_TEMP/upload-keystore.jks"
 
+      - name: Validate release signing configuration
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/upload-keystore.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "Missing ANDROID_KEYSTORE_PASSWORD secret"; exit 1; }
+          keytool -list -keystore "$ANDROID_KEYSTORE_FILE" -storepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null
+          echo "Keystore password validated successfully."
+
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
@@ -51,8 +60,15 @@ jobs:
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/upload-keystore.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: gradle --no-daemon bundleRelease
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEY_ALIAS" ]; then
+            ANDROID_KEY_ALIAS="$(keytool -list -v -keystore "$ANDROID_KEYSTORE_FILE" -storepass "$ANDROID_KEYSTORE_PASSWORD" 2>/dev/null | awk -F': ' '/^Alias name:/{print $2; exit}')"
+          fi
+          test -n "$ANDROID_KEY_ALIAS" || { echo "Could not determine keystore alias. Set ANDROID_KEY_ALIAS secret."; exit 1; }
+          export ANDROID_KEY_ALIAS
+          echo "Using keystore alias: $ANDROID_KEY_ALIAS"
+          gradle --no-daemon bundleRelease
 
       - name: Upload APK and AAB
         uses: actions/upload-artifact@v4
