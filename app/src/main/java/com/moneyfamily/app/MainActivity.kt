@@ -338,5 +338,112 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
   if(items.isEmpty())Text("Nessun valore")
   items.forEach{item->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(item.second);if(!item.third)Text("Disattivato",style=MaterialTheme.typography.labelSmall)};TextButton(onClick={onEdit(item)}){Text("✏")};TextButton(onClick={onDelete(item)}){Text(if(item.third)"🗑" else "↻")}}}
  }}
+}\n\n
+@Composable private fun PremiumCard(billing:PremiumBilling,isPremium:Boolean){
+ val context=LocalContext.current
+ Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+  Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+    Text("MoneyFamily Premium",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f))
+    Text(if(isPremium)"ATTIVO" else "PREMIUM",style=MaterialTheme.typography.labelLarge,color=if(isPremium)PositiveColor else MaterialTheme.colorScheme.primary)
+   }
+   Text(if(isPremium)"Budget, analisi avanzate e sincronizzazione sono sbloccati." else "Sblocca Budget, confronto mese/anno, warning e funzioni cloud.",style=MaterialTheme.typography.bodyMedium)
+   if(!isPremium){
+    val price=billing.price()
+    Button(onClick={val activity=context as? android.app.Activity;if(activity!=null)billing.launchPurchase(activity)},modifier=Modifier.fillMaxWidth()){
+     Text(if(price!=null)"Acquista Premium · $price" else "Acquista Premium")
+    }
+    if(price==null)Text("Il prodotto Premium deve essere configurato su Google Play per rendere disponibile l'acquisto.",style=MaterialTheme.typography.labelSmall)
+   }
+  }
+ }
+}
+
+@Composable private fun DashboardComparisonCard(data:List<UiMovement>,month:Calendar,isPremium:Boolean){
+ if(!isPremium){
+  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+   Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Confronto mese/anno dei costi reali",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));Text("PREMIUM",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)}
+    Text("Confronta i costi reali per tipologia o categoria tra il periodo selezionato e quello precedente.",style=MaterialTheme.typography.bodyMedium)
+   }
+  }
+  return
+ }
+ var period by remember{mutableStateOf("Mese")}
+ var dimension by remember{mutableStateOf("Tipologia")}
+ val previous=if(period=="Mese")shift(month,-1) else (month.clone() as Calendar).apply{add(Calendar.YEAR,-1)}
+ val currentItems=if(period=="Mese")data.filter{same(it.date,month)} else data.filter{parse(it.date)?.get(Calendar.YEAR)==month.get(Calendar.YEAR)}
+ val previousItems=if(period=="Mese")data.filter{same(it.date,previous)} else data.filter{parse(it.date)?.get(Calendar.YEAR)==previous.get(Calendar.YEAR)}
+ fun key(x:UiMovement)=if(dimension=="Tipologia")x.typeName.ifBlank{"Da classificare"} else x.category.ifBlank{"Non classificata"}
+ fun costs(items:List<UiMovement>)=items.filter{it.amount<0}.groupBy(::key).mapValues{(_,v)->-v.sumOf{it.amount}}
+ val cur=costs(currentItems);val prev=costs(previous)
+ val keys=(cur.keys+prev.keys).distinct().sorted()
+ Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+  Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+   Text("Confronto mese/anno dei costi reali",style=MaterialTheme.typography.titleLarge)
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+    listOf("Mese","Anno").forEach{p->FilterChip(selected=period==p,onClick={period=p},label={Text(p)})}
+    listOf("Tipologia","Categoria").forEach{d->FilterChip(selected=dimension==d,onClick={dimension=d},label={Text(d)})}
+   }
+   Text(if(period=="Mese")"${mf.format(month.time)} vs ${mf.format(previous.time)}" else "${month.get(Calendar.YEAR)} vs ${previous.get(Calendar.YEAR)}",style=MaterialTheme.typography.labelLarge)
+   if(keys.isEmpty()) Text("Nessun costo disponibile.")
+   else keys.forEach{label->
+    val a=cur[label]?:0.0;val b=prev[label]?:0.0;val delta=a-b
+    Column(verticalArrangement=Arrangement.spacedBy(3.dp)){
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(label,modifier=Modifier.weight(1f));Text(money.format(a));Text("Δ "+money.format(delta),color=if(delta>0)NegativeColor else PositiveColor)}
+     Text("Periodo precedente: "+money.format(b),style=MaterialTheme.typography.labelSmall)
+    }
+   }
+  }
+ }
+}
+
+@Composable private fun BudgetScreen(types:List<TypeEntity>,cats:List<CategoryEntity>,links:List<TypeCategoryEntity>,data:List<UiMovement>,month:Calendar,billing:PremiumBilling,isPremium:Boolean){
+ val context=LocalContext.current
+ if(!isPremium){
+  LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+   item{Text("Budget",style=MaterialTheme.typography.headlineSmall)}
+   item{PremiumCard(billing,isPremium)}
+  }
+  return
+ }
+ val store=remember{BudgetStore(context)}
+ var selectedMonth by remember{mutableStateOf(month.clone() as Calendar)}
+ var values by remember{mutableStateOf<Map<String,Double>>(emptyMap())}
+ fun reload(){values=store.get(monthKey(selectedMonth))}
+ LaunchedEffect(selectedMonth.timeInMillis,types){reload()}
+ val actualByType=data.filter{same(it.date,selectedMonth)&&it.amount<0}.groupBy{it.typeName}.mapValues{(_,v)->-v.sumOf{it.amount}}
+ val actualByCategory=data.filter{same(it.date,selectedMonth)&&it.amount<0}.groupBy{it.category.ifBlank{"Non classificata"}}.mapValues{(_,v)->-v.sumOf{it.amount}}
+ val budgetByCategory=types.associate{t->
+  val catId=links.find{it.typeId==t.id}?.categoryId
+  val cat=cats.find{it.id==catId}?.name ?: "Non classificata"
+  cat to ((values[t.name]?:0.0)+(types.filter{tt->links.find{it.typeId==tt.id}?.categoryId==catId&&tt.name!=t.name}.sumOf{values[it.name]?:0.0}))
+ }
+ LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+  item{Text("Budget",style=MaterialTheme.typography.headlineSmall)}
+  item{MonthBar(mf.format(selectedMonth.time),{selectedMonth=shift(selectedMonth,-1)},{selectedMonth=shift(selectedMonth,1)})}
+  item{Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("Budget mensile per tipologia",style=MaterialTheme.typography.titleLarge)
+   types.filter{it.active}.forEach{t->
+    val budget=values[t.name]?:0.0;val actual=actualByType[t.name]?:0.0;val pct=if(budget>0)actual/budget else 0.0
+    OutlinedTextField(value=if(budget==0.0)"" else budget.toString(),onValueChange={v->store.set(monthKey(selectedMonth),t.name,v.replace(',','.').toDoubleOrNull()?:0.0);reload()},label={Text(t.name)},singleLine=true,modifier=Modifier.fillMaxWidth())
+    if(budget>0){
+     Text("Effettivo: ${money.format(actual)} · ${(pct*100).toInt()}%",color=when{pct>=1.0->NegativeColor;pct>=0.8->androidx.compose.ui.graphics.Color(0xFFF9A825);else->PositiveColor})
+    }
+   }
+  }}}
+  item{Button(onClick={store.copy(monthKey(selectedMonth),monthKey(shift(selectedMonth,1)));reload()},modifier=Modifier.fillMaxWidth()){Text("Copia budget al mese successivo")}}
+  item{Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("Confronto Budget / Effettivo",style=MaterialTheme.typography.titleLarge)
+   types.groupBy{t->cats.find{c->c.id==links.find{l->l.typeId==t.id}?.categoryId}?.name?:"Non classificata"}.forEach{(cat,ts)->
+    val budget=ts.sumOf{values[it.name]?:0.0};val actual=actualByCategory[cat]?:0.0;val pct=if(budget>0)actual/budget else 0.0
+    Text(cat,style=MaterialTheme.typography.titleMedium)
+    Text("Budget: ${money.format(budget)} · Effettivo: ${money.format(actual)}")
+    if(budget>0) LinearProgressIndicator(progress={pct.coerceIn(0.0,1.0).toFloat()},modifier=Modifier.fillMaxWidth())
+    if(budget>0&&pct>=1.0)Text("⚠ Budget superato del 100%",color=NegativeColor)
+    else if(budget>0&&pct>=0.8)Text("⚠ Budget superato dell'80%",color=androidx.compose.ui.graphics.Color(0xFFF9A825))
+   }
+  }}}
+ }
 }
 
