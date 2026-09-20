@@ -639,3 +639,5 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
    }
   }}}
  }
+
+}
