@@ -62,7 +62,7 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
  fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh()}}
  fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh()}}
- MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni","Budget").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={Icon(when(i){0->Icons.Outlined.Dashboard;1->Icons.Outlined.ListAlt;2->Icons.Outlined.AddCircle;3->Icons.Outlined.Settings;else->Icons.Outlined.AccountBalanceWallet},contentDescription=t)},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period->scope.launch{repo.deleteAll(data.filter{same(it.date,period)}.map{it.model()});refresh()}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()},premiumBilling,isPremium);4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
+ MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni","Budget").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={Icon(when(i){0->Icons.Outlined.Dashboard;1->Icons.Outlined.ListAlt;2->Icons.Outlined.AddCircle;3->Icons.Outlined.Settings;else->Icons.Outlined.AccountBalanceWallet},contentDescription=t)},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh()}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()},premiumBilling,isPremium);4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
 }
 
 @Composable private fun Dashboard(data:List<UiMovement>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit,isPremium:Boolean){
@@ -184,34 +184,100 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
 
 @Composable private fun Operations(
  data:List<UiMovement>, types:List<TypeEntity>, cats:List<CategoryEntity>, members:List<FamilyMemberEntity>,
- month:Calendar, prev:()->Unit, next:()->Unit, edit:(UiMovement)->Unit, remove:(UiMovement)->Unit, deletePeriod:(Calendar)->Unit
+ month:Calendar, prev:()->Unit, next:()->Unit, edit:(UiMovement)->Unit, remove:(UiMovement)->Unit,
+ deletePeriod:(Calendar,Boolean)->Unit
 ){
  val context=LocalContext.current
  val scope=rememberCoroutineScope()
- var q by remember{mutableStateOf("")}; var confirmDelete by remember{mutableStateOf(false)}
+ var annual by remember{mutableStateOf(false)}
+ var q by remember{mutableStateOf("")}
+ var confirmDelete by remember{mutableStateOf(false)}
  var exportStatus by remember{mutableStateOf("")}
- val exportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")){uri->if(uri!=null)scope.launch{runCatching{ExcelExporter.write(context,uri,data);exportStatus="Operazioni esportate in Excel"}.onFailure{exportStatus="Errore esportazione: "+(it.message?:"operazione non riuscita")}}}
- var type by remember{mutableStateOf("")}; var cat by remember{mutableStateOf("")}; var member by remember{mutableStateOf("")}; var kind by remember{mutableStateOf("")}
- val filtered=data.filter{same(it.date,month)&&it.description.contains(q,true)&&(type.isBlank()||it.typeName==type)&&(cat.isBlank()||it.category==cat)&&(member.isBlank()||it.member==member)&&(kind.isBlank()||(kind=="Spese"&&it.amount<0)||(kind=="Ricavi"&&it.amount>0))}
+ var type by remember{mutableStateOf("")}
+ var cat by remember{mutableStateOf("")}
+ var member by remember{mutableStateOf("")}
+ var kind by remember{mutableStateOf("")}
+
+ val year=month.get(Calendar.YEAR)
+ val base=if(annual)data.filter{parse(it.date)?.get(Calendar.YEAR)==year}else data.filter{same(it.date,month)}
+ val filtered=base.filter{
+  it.description.contains(q,true) &&
+  (type.isBlank()||it.typeName==type) &&
+  (cat.isBlank()||it.category==cat) &&
+  (member.isBlank()||it.member==member) &&
+  (kind.isBlank()||(kind=="Spese"&&it.amount<0)||(kind=="Ricavi"&&it.amount>0))
+ }.sortedByDescending{parse(it.date)?.timeInMillis?:0L}
+
+ val income=base.filter{it.amount>0}.sumOf{it.amount}
+ val expense=base.filter{it.amount<0}.sumOf{it.amount}
+ val balance=income+expense
+
+ val exportLauncher=rememberLauncherForActivityResult(
+  ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+ ){uri->
+  if(uri!=null)scope.launch{
+   runCatching{
+    ExcelExporter.write(context,uri,filtered)
+    exportStatus="Operazioni esportate in Excel"
+   }.onFailure{
+    exportStatus="Errore esportazione: "+(it.message?:"operazione non riuscita")
+   }
+  }
+ }
+
  Column(Modifier.fillMaxSize().padding(16.dp)){
-  MonthBar(mf.format(month.time),prev,next)
-  OutlinedButton(onClick={confirmDelete=true},modifier=Modifier.fillMaxWidth()){Text("Cancella tutte le operazioni del periodo")}
-  OutlinedButton(onClick={exportLauncher.launch("MoneyFamily_Operazioni.xlsx")},modifier=Modifier.fillMaxWidth()){Text("Scarica in Excel")}
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+   FilterChip(selected=!annual,onClick={annual=false},label={Text("Mese")},modifier=Modifier.weight(1f))
+   FilterChip(selected=annual,onClick={annual=true},label={Text("Anno")},modifier=Modifier.weight(1f))
+  }
+  if(annual){
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
+    OutlinedButton(onClick={month=shift(month,-12)}){Text("‹")}
+    Text("Riepilogo $year",style=MaterialTheme.typography.titleLarge)
+    OutlinedButton(onClick={month=shift(month,12)}){Text("›")}
+   }
+  }else{
+   MonthBar(mf.format(month.time),prev,next)
+  }
+
+  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+    MetricCard("Entrate",income,Modifier.weight(1f))
+    MetricCard("Uscite",expense,Modifier.weight(1f))
+    MetricCard("Saldo",balance,Modifier.weight(1f))
+   }
+  }
+
+  OutlinedButton(onClick={confirmDelete=true},modifier=Modifier.fillMaxWidth()){
+   Text(if(annual)"Cancella tutte le operazioni dell'anno $year" else "Cancella tutte le operazioni del periodo")
+  }
+  OutlinedButton(onClick={exportLauncher.launch("MoneyFamily_Operazioni_${if(annual)year else mf.format(month.time)}.xlsx")},modifier=Modifier.fillMaxWidth()){
+   Text("Scarica in Excel")
+  }
   if(exportStatus.isNotBlank())Text(exportStatus,color=if(exportStatus.startsWith("Errore"))NegativeColor else PositiveColor)
-  if(exportStatus.isNotBlank())Text(exportStatus,color=if(exportStatus.startsWith("Errore"))NegativeColor else PositiveColor)
-  OutlinedTextField(value=q,onValueChange={q=it},label={Text("Cerca descrizione")},modifier=Modifier.fillMaxWidth())
-  Choice("Tipologia",type.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+types.map{it.name}){type=if(it=="Tutte")"" else it}
-  Choice("Categoria",cat.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+cats.map{it.name}){cat=if(it=="Tutte")"" else it}
-  Choice("Componente",member.ifBlank{"Tutti"},LocalContext.current,listOf("Tutti")+members.map{it.name}){member=if(it=="Tutti")"" else it}
-  Choice("Tipo",kind.ifBlank{"Tutti"},LocalContext.current,listOf("Tutti","Spese","Ricavi")){kind=if(it=="Tutti")"" else it}
-  LazyColumn(verticalArrangement=Arrangement.spacedBy(6.dp)){
-   items(filtered.sortedByDescending{parse(it.date)?.timeInMillis?:0L}){x->
+
+  OutlinedTextField(value=q,onValueChange={q=it},label={Text(if(annual)"Cerca tra tutte le operazioni dell'anno" else "Cerca descrizione")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+
+  Choice("Tipologia",type.ifBlank{"Tutte"},context,listOf("Tutte")+types.map{it.name}){type=if(it=="Tutte")"" else it}
+  Choice("Categoria",cat.ifBlank{"Tutte"},context,listOf("Tutte")+cats.map{it.name}){cat=if(it=="Tutte")"" else it}
+  Choice("Componente",member.ifBlank{"Tutti"},context,listOf("Tutti")+members.map{it.name}){member=if(it=="Tutti")"" else it}
+  Choice("Tipo",kind.ifBlank{"Tutti"},context,listOf("Tutti","Spese","Ricavi")){kind=if(it=="Tutti")"" else it}
+
+  Text(
+   if(annual)"${filtered.size} operazioni trovate nell'anno $year"
+   else "${filtered.size} operazioni trovate nel mese",
+   style=MaterialTheme.typography.labelLarge
+  )
+
+  LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)){
+   items(filtered){x->
     Card(Modifier.fillMaxWidth()){Column(Modifier.padding(12.dp)){
      Text(x.description.ifBlank{x.type.name},style=MaterialTheme.typography.titleMedium)
      Text("${x.typeName.ifBlank{"Non classificata"}} • ${x.category} • ${x.member} • ${x.date}")
      Text(money.format(x.amount))
      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
-      TextButton(onClick={edit(x)}){Text("Modifica")}; TextButton(onClick={remove(x)}){Text("Elimina")}
+      TextButton(onClick={edit(x)}){Text("Modifica")}
+      TextButton(onClick={remove(x)}){Text("Elimina")}
      }
     }}
    }
@@ -219,9 +285,9 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
  }
  if(confirmDelete) AlertDialog(
   onDismissRequest={confirmDelete=false},
-  title={Text("Cancella operazioni")},
-  text={Text("Vuoi eliminare tutte le operazioni di ${mf.format(month.time)}? Questa operazione non può essere annullata.")},
-  confirmButton={TextButton(onClick={confirmDelete=false;deletePeriod(month)}){Text("Cancella")}},
+  title={Text(if(annual)"Cancella operazioni dell'anno" else "Cancella operazioni")},
+  text={Text(if(annual)"Vuoi eliminare tutte le operazioni del $year? Questa operazione non può essere annullata." else "Vuoi eliminare tutte le operazioni di ${mf.format(month.time)}? Questa operazione non può essere annullata.")},
+  confirmButton={TextButton(onClick={confirmDelete=false;deletePeriod(month,annual)}){Text("Cancella")}},
   dismissButton={TextButton(onClick={confirmDelete=false}){Text("Annulla")}}
  )
 }
