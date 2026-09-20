@@ -28,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import kotlin.math.abs
 import androidx.compose.ui.platform.LocalContext
 import com.moneyfamily.app.data.*
@@ -499,35 +501,91 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
  if(!isPremium){
   Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
    Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Confronto mese/anno dei costi reali",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));Text("PREMIUM",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)}
-    Text("Confronta i costi reali per tipologia o categoria tra il periodo selezionato e quello precedente.",style=MaterialTheme.typography.bodyMedium)
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Confronto costi effettivi",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));Text("PREMIUM",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)}
+    Text("Confronta due mesi specifici oppure due anni, per tipologia o categoria.",style=MaterialTheme.typography.bodyMedium)
    }
   }
   return
  }
- var period by remember{mutableStateOf("Mese")}
+ var mode by remember{mutableStateOf("Mese")}
  var dimension by remember{mutableStateOf("Tipologia")}
- val previous=if(period=="Mese")shift(month,-1) else (month.clone() as Calendar).apply{add(Calendar.YEAR,-1)}
- val currentItems=if(period=="Mese")data.filter{same(it.date,month)} else data.filter{parse(it.date)?.get(Calendar.YEAR)==month.get(Calendar.YEAR)}
- val previousItems=if(period=="Mese")data.filter{same(it.date,previous)} else data.filter{parse(it.date)?.get(Calendar.YEAR)==previous.get(Calendar.YEAR)}
+ var firstMonth by remember{mutableStateOf(month.clone() as Calendar)}
+ var secondMonth by remember{mutableStateOf(shift(month,-1))}
+ var firstYear by remember{mutableStateOf(month.get(Calendar.YEAR))}
+ var secondYear by remember{mutableStateOf(month.get(Calendar.YEAR)-1)}
+
  fun key(x:UiMovement)=if(dimension=="Tipologia")x.typeName.ifBlank{"Da classificare"} else x.category.ifBlank{"Non classificata"}
- fun costs(items:List<UiMovement>)=items.filter{it.amount<0}.groupBy(::key).mapValues{(_,v)->-v.sumOf{it.amount}}
- val cur=costs(currentItems);val prev=costs(previousItems)
- val keys=(cur.keys+prev.keys).distinct().sorted()
+ fun actual(items:List<UiMovement>)=items.groupBy(::key).mapValues{(_,v)->-v.sumOf{it.amount}}
+ val firstItems=if(mode=="Mese")data.filter{same(it.date,firstMonth)}else data.filter{parse(it.date)?.get(Calendar.YEAR)==firstYear}
+ val secondItems=if(mode=="Mese")data.filter{same(it.date,secondMonth)}else data.filter{parse(it.date)?.get(Calendar.YEAR)==secondYear}
+ val first=actual(firstItems)
+ val second=actual(secondItems)
+ val keys=(first.keys+second.keys).distinct().sorted()
+ val firstLabel=if(mode=="Mese")mf.format(firstMonth.time) else firstYear.toString()
+ val secondLabel=if(mode=="Mese")mf.format(secondMonth.time) else secondYear.toString()
+
  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
   Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-   Text("Confronto mese/anno dei costi reali",style=MaterialTheme.typography.titleLarge)
+   Text("Confronto costi effettivi",style=MaterialTheme.typography.titleLarge)
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-    listOf("Mese","Anno").forEach{p->FilterChip(selected=period==p,onClick={period=p},label={Text(p)})}
-    listOf("Tipologia","Categoria").forEach{d->FilterChip(selected=dimension==d,onClick={dimension=d},label={Text(d)})}
+    FilterChip(selected=mode=="Mese",onClick={mode="Mese"},label={Text("Mese / Mese")},modifier=Modifier.weight(1f))
+    FilterChip(selected=mode=="Anno",onClick={mode="Anno"},label={Text("Anno / Anno")},modifier=Modifier.weight(1f))
    }
-   Text(if(period=="Mese")"${mf.format(month.time)} vs ${mf.format(previous.time)}" else "${month.get(Calendar.YEAR)} vs ${previous.get(Calendar.YEAR)}",style=MaterialTheme.typography.labelLarge)
+   Text("Raggruppa il confronto per:",style=MaterialTheme.typography.labelLarge)
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+    FilterChip(selected=dimension=="Tipologia",onClick={dimension="Tipologia"},label={Text("TIPOLOGIA")},modifier=Modifier.weight(1f))
+    FilterChip(selected=dimension=="Categoria",onClick={dimension="Categoria"},label={Text("CATEGORIA")},modifier=Modifier.weight(1f))
+   }
+   Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){
+    Text(
+     if(dimension=="Tipologia")"Visualizzazione attiva: solo TIPOLOGIE" else "Visualizzazione attiva: solo CATEGORIE",
+     modifier=Modifier.padding(horizontal=12.dp,vertical=8.dp),
+     style=MaterialTheme.typography.labelLarge
+    )
+   }
+   if(mode=="Mese"){
+    Text("Periodo 1",style=MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={firstMonth=shift(firstMonth,-1)},modifier=Modifier.weight(1f)){Text("‹")}
+     Text(firstLabel,modifier=Modifier.weight(3f),style=MaterialTheme.typography.bodyLarge)
+     OutlinedButton(onClick={firstMonth=shift(firstMonth,1)},modifier=Modifier.weight(1f)){Text("›")}
+    }
+    Text("Periodo 2",style=MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={secondMonth=shift(secondMonth,-1)},modifier=Modifier.weight(1f)){Text("‹")}
+     Text(secondLabel,modifier=Modifier.weight(3f),style=MaterialTheme.typography.bodyLarge)
+     OutlinedButton(onClick={secondMonth=shift(secondMonth,1)},modifier=Modifier.weight(1f)){Text("›")}
+    }
+   }else{
+    Text("Periodo 1",style=MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={firstYear-=1},modifier=Modifier.weight(1f)){Text("‹")}
+     Text(firstYear.toString(),modifier=Modifier.weight(3f),style=MaterialTheme.typography.bodyLarge)
+     OutlinedButton(onClick={firstYear+=1},modifier=Modifier.weight(1f)){Text("›")}
+    }
+    Text("Periodo 2",style=MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={secondYear-=1},modifier=Modifier.weight(1f)){Text("‹")}
+     Text(secondYear.toString(),modifier=Modifier.weight(3f),style=MaterialTheme.typography.bodyLarge)
+     OutlinedButton(onClick={secondYear+=1},modifier=Modifier.weight(1f)){Text("›")}
+    }
+   }
+   Text("${firstLabel} vs ${secondLabel}",style=MaterialTheme.typography.labelLarge)
    if(keys.isEmpty()) Text("Nessun costo disponibile.")
    else keys.forEach{label->
-    val a=cur[label]?:0.0;val b=prev[label]?:0.0;val delta=a-b
+    val a=first[label]?:0.0
+    val b=second[label]?:0.0
+    val delta=a-b
+    val pct=if(b!=0.0)delta/b*100.0 else null
     Column(verticalArrangement=Arrangement.spacedBy(3.dp)){
-     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(label,modifier=Modifier.weight(1f));Text(money.format(a));Text("Δ "+money.format(delta),color=if(delta>0)NegativeColor else PositiveColor)}
-     Text("Periodo precedente: "+money.format(b),style=MaterialTheme.typography.labelSmall)
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
+      Text(label,modifier=Modifier.weight(1f))
+      Text(money.format(a))
+     }
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
+      Text("${secondLabel}: ${money.format(b)}",style=MaterialTheme.typography.labelSmall)
+      Text("Δ ${money.format(delta)}"+(pct?.let{" · ${String.format(Locale.ITALY,"%.1f%%",it)}"}?:""),color=if(delta>0)NegativeColor else if(delta<0)PositiveColor else MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.labelSmall)
+     }
     }
    }
   }
@@ -546,7 +604,12 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
  val store=remember{BudgetStore(context)}
  var selectedMonth by remember{mutableStateOf(month.clone() as Calendar)}
  var values by remember{mutableStateOf<Map<String,Double>>(emptyMap())}
- fun reload(){values=store.get(monthKey(selectedMonth))}
+ var budgetInputs by remember{mutableStateOf<Map<String,String>>(emptyMap())}
+ fun reload(){
+  val loaded=store.get(monthKey(selectedMonth))
+  values=loaded
+  budgetInputs=types.filter{it.active}.associate{it.name to if(loaded[it.name]==null||loaded[it.name]==0.0)"" else loaded[it.name]!!.toString()}
+ }
  LaunchedEffect(selectedMonth.timeInMillis,types){reload()}
  val actualByType=data.filter{same(it.date,selectedMonth)}.groupBy{it.typeName}.mapValues{(_,v)->-v.sumOf{it.amount}}
  val actualByCategory=data.filter{same(it.date,selectedMonth)}.groupBy{it.category.ifBlank{"Non classificata"}}.mapValues{(_,v)->-v.sumOf{it.amount}}
@@ -557,7 +620,14 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
    Text("Budget mensile per tipologia",style=MaterialTheme.typography.titleLarge)
    types.filter{it.active}.forEach{t->
     val budget=values[t.name]?:0.0;val actual=actualByType[t.name]?:0.0;val pct=if(budget>0)actual/budget else 0.0
-    OutlinedTextField(value=if(budget==0.0)"" else budget.toString(),onValueChange={v->store.set(monthKey(selectedMonth),t.name,v.replace(',','.').toDoubleOrNull()?:0.0);reload()},label={Text(t.name)},singleLine=true,modifier=Modifier.fillMaxWidth())
+    OutlinedTextField(
+     value=budgetInputs[t.name]?:if(budget==0.0)"" else budget.toString(),
+     onValueChange={v->budgetInputs=budgetInputs+(t.name to v);v.replace(',','.').toDoubleOrNull()?.let{store.set(monthKey(selectedMonth),t.name,it);values=values+(t.name to it)}},
+     label={Text(t.name)},
+     singleLine=true,
+     keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),
+     modifier=Modifier.fillMaxWidth()
+    )
     if(budget>0){
      Text("Effettivo: ${money.format(actual)} · ${(pct*100).toInt()}%",color=when{pct>=1.0->NegativeColor;pct>=0.8->androidx.compose.ui.graphics.Color(0xFFF9A825);else->PositiveColor})
     }
@@ -565,16 +635,31 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
   }}}
   item{Button(onClick={store.copy(monthKey(selectedMonth),monthKey(shift(selectedMonth,1)));reload()},modifier=Modifier.fillMaxWidth()){Text("Copia budget al mese successivo")}}
   item{Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-   Text("Confronto Budget / Effettivo",style=MaterialTheme.typography.titleLarge)
-   types.groupBy{t->cats.find{c->c.id==links.find{l->l.typeId==t.id}?.categoryId}?.name?:"Non classificata"}.forEach{(cat,ts)->
-    val budget=ts.sumOf{values[it.name]?:0.0};val actual=actualByCategory[cat]?:0.0;val pct=if(budget>0)actual/budget else 0.0
+   Text("Confronto Budget / Effettivo — Tipologia",style=MaterialTheme.typography.titleLarge)
+   types.filter{it.active}.forEach{t->
+    val budget=values[t.name]?:0.0
+    val actual=actualByType[t.name]?:0.0
+    val pct=if(budget>0)actual/budget else 0.0
+    Text(t.name,style=MaterialTheme.typography.titleMedium)
+    Text("Budget: ${money.format(budget)} · Effettivo: ${money.format(actual)}")
+    if(budget>0) LinearProgressIndicator(progress=pct.coerceIn(0.0,1.0).toFloat(),modifier=Modifier.fillMaxWidth())
+    if(budget>0&&pct>=1.0)Text("⚠ Budget raggiunto/superato",color=NegativeColor)
+    else if(budget>0&&pct>=0.8)Text("⚠ Budget utilizzato almeno all'80%",color=androidx.compose.ui.graphics.Color(0xFFF9A825))
+   }
+  }}}
+  item{Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("Confronto Budget / Effettivo — Categoria",style=MaterialTheme.typography.titleLarge)
+   types.filter{it.active}.groupBy{t->cats.find{c->c.id==links.find{l->l.typeId==t.id}?.categoryId}?.name?:"Non classificata"}.forEach{(cat,ts)->
+    val budget=ts.sumOf{values[it.name]?:0.0}
+    val actual=actualByCategory[cat]?:0.0
+    val pct=if(budget>0)actual/budget else 0.0
     Text(cat,style=MaterialTheme.typography.titleMedium)
     Text("Budget: ${money.format(budget)} · Effettivo: ${money.format(actual)}")
     if(budget>0) LinearProgressIndicator(progress=pct.coerceIn(0.0,1.0).toFloat(),modifier=Modifier.fillMaxWidth())
-    if(budget>0&&pct>=1.0)Text("⚠ Budget superato del 100%",color=NegativeColor)
-    else if(budget>0&&pct>=0.8)Text("⚠ Budget superato dell'80%",color=androidx.compose.ui.graphics.Color(0xFFF9A825))
+    if(budget>0&&pct>=1.0)Text("⚠ Budget raggiunto/superato",color=NegativeColor)
+    else if(budget>0&&pct>=0.8)Text("⚠ Budget utilizzato almeno all'80%",color=androidx.compose.ui.graphics.Color(0xFFF9A825))
    }
   }}}
  }
-}
 
+}
