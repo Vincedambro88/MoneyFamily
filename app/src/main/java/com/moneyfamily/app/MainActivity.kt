@@ -60,7 +60,7 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
  var isPremium by remember{mutableStateOf(false)}
  val premiumBilling=remember{PremiumBilling(c){isPremium=true}}
  fun refresh(){scope.launch{data=repo.all().map{it.ui()};types=repo.allTypes();cats=repo.allCategories();members=repo.allMembers();links=repo.allMappings()}}
- LaunchedEffect(Unit){isPremium=premiumBilling.isPremium() || BuildConfig.PREMIUM_TEST_MODE;premiumBilling.connect();refresh()}
+ LaunchedEffect(Unit){isPremium=premiumBilling.isPremium();premiumBilling.connect();refresh()}
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
  fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh()}}
  fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh()}}
