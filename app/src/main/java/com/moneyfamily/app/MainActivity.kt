@@ -301,7 +301,7 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
 
 
 @Composable private fun AnnualSummaryCard(data:List<UiMovement>,month:Calendar){
- val year=operationMonth.get(Calendar.YEAR);val yearly=data.filter{parse(it.date)?.get(Calendar.YEAR)==year};val income=yearly.filter{it.amount>0}.sumOf{it.amount};val expense=yearly.filter{it.amount<0}.sumOf{it.amount};val balance=income+expense
+ val year=month.get(Calendar.YEAR);val yearly=data.filter{parse(it.date)?.get(Calendar.YEAR)==year};val income=yearly.filter{it.amount>0}.sumOf{it.amount};val expense=yearly.filter{it.amount<0}.sumOf{it.amount};val balance=income+expense
  val monthly=(0..11).map{m->m to yearly.filter{parse(it.date)?.get(Calendar.MONTH)==m}.sumOf{it.amount}}
  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){Text("Riepilogo esercizio $year",style=MaterialTheme.typography.titleLarge);Text("${yearly.size} operazioni",style=MaterialTheme.typography.labelMedium)}
