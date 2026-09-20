@@ -49,8 +49,8 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
  var month by remember{mutableStateOf(Calendar.getInstance())}
  var edit by remember{mutableStateOf<UiMovement?>(null)}
  var add by remember{mutableStateOf(false)}
- val premiumBilling=remember{PremiumBilling(c){isPremium=true}}
  var isPremium by remember{mutableStateOf(false)}
+ val premiumBilling=remember{PremiumBilling(c){isPremium=true}}
  fun refresh(){scope.launch{data=repo.all().map{it.ui()};types=repo.allTypes();cats=repo.allCategories();members=repo.allMembers();links=repo.allMappings()}}
  LaunchedEffect(Unit){isPremium=premiumBilling.isPremium();premiumBilling.connect();refresh()}
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
@@ -424,11 +424,6 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
  LaunchedEffect(selectedMonth.timeInMillis,types){reload()}
  val actualByType=data.filter{same(it.date,selectedMonth)&&it.amount<0}.groupBy{it.typeName}.mapValues{(_,v)->-v.sumOf{it.amount}}
  val actualByCategory=data.filter{same(it.date,selectedMonth)&&it.amount<0}.groupBy{it.category.ifBlank{"Non classificata"}}.mapValues{(_,v)->-v.sumOf{it.amount}}
- val budgetByCategory=types.associate{t->
-  val catId=links.find{it.typeId==t.id}?.categoryId
-  val cat=cats.find{it.id==catId}?.name ?: "Non classificata"
-  cat to ((values[t.name]?:0.0)+(types.filter{tt->links.find{it.typeId==tt.id}?.categoryId==catId&&tt.name!=t.name}.sumOf{values[it.name]?:0.0}))
- }
  LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
   item{Text("Budget",style=MaterialTheme.typography.headlineSmall)}
   item{MonthBar(mf.format(selectedMonth.time),{selectedMonth=shift(selectedMonth,-1)},{selectedMonth=shift(selectedMonth,1)})}
@@ -449,7 +444,7 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
     val budget=ts.sumOf{values[it.name]?:0.0};val actual=actualByCategory[cat]?:0.0;val pct=if(budget>0)actual/budget else 0.0
     Text(cat,style=MaterialTheme.typography.titleMedium)
     Text("Budget: ${money.format(budget)} · Effettivo: ${money.format(actual)}")
-    if(budget>0) LinearProgressIndicator(progress={pct.coerceIn(0.0,1.0).toFloat()},modifier=Modifier.fillMaxWidth())
+    if(budget>0) LinearProgressIndicator(progress=pct.coerceIn(0.0,1.0).toFloat(),modifier=Modifier.fillMaxWidth())
     if(budget>0&&pct>=1.0)Text("⚠ Budget superato del 100%",color=NegativeColor)
     else if(budget>0&&pct>=0.8)Text("⚠ Budget superato dell'80%",color=androidx.compose.ui.graphics.Color(0xFFF9A825))
    }
