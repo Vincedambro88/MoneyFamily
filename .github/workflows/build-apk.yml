@@ -1,4 +1,4 @@
-name: Build MoneyFamily AAB
+name: Build MoneyFamily AAB + APK
 
 on:
   workflow_dispatch:
@@ -65,16 +65,20 @@ jobs:
           test -n "$ANDROID_KEY_ALIAS" || { echo "Could not determine keystore alias. Set ANDROID_KEY_ALIAS secret."; exit 1; }
           export ANDROID_KEY_ALIAS
           echo "Using keystore alias: $ANDROID_KEY_ALIAS"
-          gradle --no-daemon bundleRelease
+          gradle --no-daemon bundleRelease assembleRelease
 
       - name: Verify AAB
         run: |
           test -s app/build/outputs/bundle/release/app-release.aab
           ls -lh app/build/outputs/bundle/release/app-release.aab
+          test -s app/build/outputs/apk/release/app-release.apk
+          ls -lh app/build/outputs/apk/release/app-release.apk
 
-      - name: Upload AAB
+      - name: Upload AAB + APK
         uses: actions/upload-artifact@v4
         with:
-          name: MoneyFamily-release-AAB
-          path: app/build/outputs/bundle/release/app-release.aab
+          name: MoneyFamily-release-AAB-APK
+          path: |
+            app/build/outputs/bundle/release/app-release.aab
+            app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
