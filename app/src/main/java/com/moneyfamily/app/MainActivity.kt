@@ -196,6 +196,8 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
  Column(Modifier.fillMaxSize().padding(16.dp)){
   MonthBar(mf.format(month.time),prev,next)
   OutlinedButton(onClick={confirmDelete=true},modifier=Modifier.fillMaxWidth()){Text("Cancella tutte le operazioni del periodo")}
+  OutlinedButton(onClick={exportLauncher.launch("MoneyFamily_Operazioni.xlsx")},modifier=Modifier.fillMaxWidth()){Text("Scarica in Excel")}
+  if(exportStatus.isNotBlank())Text(exportStatus,color=if(exportStatus.startsWith("Errore"))NegativeColor else PositiveColor)
   if(exportStatus.isNotBlank())Text(exportStatus,color=if(exportStatus.startsWith("Errore"))NegativeColor else PositiveColor)
   OutlinedTextField(value=q,onValueChange={q=it},label={Text("Cerca descrizione")},modifier=Modifier.fillMaxWidth())
   Choice("Tipologia",type.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+types.map{it.name}){type=if(it=="Tutte")"" else it}
@@ -256,7 +258,6 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
   Button(onClick={showEditor=true},modifier=Modifier.fillMaxWidth()){Text("+ Nuova operazione")}
   OutlinedButton(onClick={templateLauncher.launch("MoneyFamily_Modello_Importazione.xlsx")},modifier=Modifier.fillMaxWidth()){Text("Scarica modello Excel")}
   OutlinedButton(onClick={launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-excel","text/csv"))},modifier=Modifier.fillMaxWidth()){Text("Importa da Excel")}
-  OutlinedButton(onClick={exportLauncher.launch("MoneyFamily_Operazioni.xlsx")},modifier=Modifier.fillMaxWidth()){Text("Scarica in Excel")}
   Text("Esporta tutte le operazioni nello stesso tracciato previsto dal modello Excel.",style=MaterialTheme.typography.bodyMedium)
   Text("Excel obbligatorio: Data | Descrizione | Importo | Tipologia | Categoria | Membro famiglia. Non inserire Entrata/Uscita: la natura dell'operazione deriva dal segno dell'Importo.",style=MaterialTheme.typography.bodyMedium)
   if(status.isNotBlank())Text(status,color=if(status.startsWith("Errore"))NegativeColor else PositiveColor)
