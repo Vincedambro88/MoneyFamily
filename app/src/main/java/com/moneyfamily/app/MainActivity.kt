@@ -123,18 +123,6 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
 }
 
 @Composable private fun PieChartCard(title:String,values:List<Pair<String,Double>>){
- val palette=listOf(
-  androidx.compose.ui.graphics.Color(0xFF4F46E5),
-  androidx.compose.ui.graphics.Color(0xFF16A34A),
-  androidx.compose.ui.graphics.Color(0xFFEA580C),
-  androidx.compose.ui.graphics.Color(0xFF0891B2),
-  androidx.compose.ui.graphics.Color(0xFFDB2777),
-  androidx.compose.ui.graphics.Color(0xFF7C3AED),
-  androidx.compose.ui.graphics.Color(0xFFCA8A04),
-  androidx.compose.ui.graphics.Color(0xFF0F766E),
-  androidx.compose.ui.graphics.Color(0xFFDC2626),
-  androidx.compose.ui.graphics.Color(0xFF475569)
- )
  val nonZero=values.filter{it.second!=0.0}
  val total=nonZero.sumOf{abs(it.second)}
  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
@@ -148,7 +136,7 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
        var start=0f
        nonZero.forEachIndexed{index,entry->
         val sweep=(abs(entry.second)/total*360.0).toFloat()
-        drawArc(color=palette[index%palette.size],startAngle=start,sweepAngle=sweep,useCenter=false,style=androidx.compose.ui.graphics.drawscope.Stroke(width=42f,cap=androidx.compose.ui.graphics.StrokeCap.Butt))
+        drawArc(color=if(entry.second<0)NegativeColor else PositiveColor,startAngle=start,sweepAngle=sweep,useCenter=false,style=androidx.compose.ui.graphics.drawscope.Stroke(width=42f,cap=androidx.compose.ui.graphics.StrokeCap.Butt))
         start+=sweep
        }
       }
@@ -160,7 +148,7 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
      Spacer(Modifier.width(16.dp))
      Column(Modifier.weight(1f).height(170.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
       nonZero.forEachIndexed{index,entry->
-       val color=palette[index%palette.size]
+       val color=if(entry.second<0)NegativeColor else PositiveColor
        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
         Box(Modifier.size(11.dp).clip(RoundedCornerShape(50)).background(color))
         Column(Modifier.weight(1f)){
