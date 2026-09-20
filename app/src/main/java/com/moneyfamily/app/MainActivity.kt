@@ -62,7 +62,23 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
  fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh()}}
  fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh()}}
- MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni","Budget").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={Icon(when(i){0->Icons.Outlined.Dashboard;1->Icons.Outlined.ListAlt;2->Icons.Outlined.AddCircle;3->Icons.Outlined.Settings;else->Icons.Outlined.AccountBalanceWallet},contentDescription=t)},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh()}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()},premiumBilling,isPremium);4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
+ MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni","Budget").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={Icon(
+ when(i){
+  0->Icons.Outlined.Dashboard
+  1->Icons.Outlined.ListAlt
+  2->Icons.Outlined.AddCircle
+  3->Icons.Outlined.Settings
+  else->Icons.Outlined.AccountBalanceWallet
+ },
+ contentDescription=t,
+ tint=when(i){
+  0->androidx.compose.ui.graphics.Color(0xFF2563EB)
+  1->androidx.compose.ui.graphics.Color(0xFF7C3AED)
+  2->androidx.compose.ui.graphics.Color(0xFF16A34A)
+  3->androidx.compose.ui.graphics.Color(0xFFEA580C)
+  else->androidx.compose.ui.graphics.Color(0xFF0891B2)
+ }
+)},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh()}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()},premiumBilling,isPremium);4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
 }
 
 @Composable private fun Dashboard(data:List<UiMovement>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit,isPremium:Boolean){
