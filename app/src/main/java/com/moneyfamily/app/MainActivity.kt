@@ -28,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import kotlin.math.abs
 import androidx.compose.ui.platform.LocalContext
 import com.moneyfamily.app.data.*
@@ -529,9 +531,17 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
     FilterChip(selected=mode=="Mese",onClick={mode="Mese"},label={Text("Mese / Mese")},modifier=Modifier.weight(1f))
     FilterChip(selected=mode=="Anno",onClick={mode="Anno"},label={Text("Anno / Anno")},modifier=Modifier.weight(1f))
    }
+   Text("Raggruppa il confronto per:",style=MaterialTheme.typography.labelLarge)
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-    FilterChip(selected=dimension=="Tipologia",onClick={dimension="Tipologia"},label={Text("Tipologia")},modifier=Modifier.weight(1f))
-    FilterChip(selected=dimension=="Categoria",onClick={dimension="Categoria"},label={Text("Categoria")},modifier=Modifier.weight(1f))
+    FilterChip(selected=dimension=="Tipologia",onClick={dimension="Tipologia"},label={Text("TIPOLOGIA")},modifier=Modifier.weight(1f))
+    FilterChip(selected=dimension=="Categoria",onClick={dimension="Categoria"},label={Text("CATEGORIA")},modifier=Modifier.weight(1f))
+   }
+   Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){
+    Text(
+     if(dimension=="Tipologia")"Visualizzazione attiva: solo TIPOLOGIE" else "Visualizzazione attiva: solo CATEGORIE",
+     modifier=Modifier.padding(horizontal=12.dp,vertical=8.dp),
+     style=MaterialTheme.typography.labelLarge
+    )
    }
    if(mode=="Mese"){
     Text("Periodo 1",style=MaterialTheme.typography.labelLarge)
@@ -594,7 +604,12 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
  val store=remember{BudgetStore(context)}
  var selectedMonth by remember{mutableStateOf(month.clone() as Calendar)}
  var values by remember{mutableStateOf<Map<String,Double>>(emptyMap())}
- fun reload(){values=store.get(monthKey(selectedMonth))}
+ var budgetInputs by remember{mutableStateOf<Map<String,String>>(emptyMap())}
+ fun reload(){
+  val loaded=store.get(monthKey(selectedMonth))
+  values=loaded
+  budgetInputs=types.filter{it.active}.associate{it.name to if(loaded[it.name]==null||loaded[it.name]==0.0)"" else loaded[it.name]!!.toString()}
+ }
  LaunchedEffect(selectedMonth.timeInMillis,types){reload()}
  val actualByType=data.filter{same(it.date,selectedMonth)}.groupBy{it.typeName}.mapValues{(_,v)->-v.sumOf{it.amount}}
  val actualByCategory=data.filter{same(it.date,selectedMonth)}.groupBy{it.category.ifBlank{"Non classificata"}}.mapValues{(_,v)->-v.sumOf{it.amount}}
@@ -605,7 +620,14 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
    Text("Budget mensile per tipologia",style=MaterialTheme.typography.titleLarge)
    types.filter{it.active}.forEach{t->
     val budget=values[t.name]?:0.0;val actual=actualByType[t.name]?:0.0;val pct=if(budget>0)actual/budget else 0.0
-    OutlinedTextField(value=if(budget==0.0)"" else budget.toString(),onValueChange={v->store.set(monthKey(selectedMonth),t.name,v.replace(',','.').toDoubleOrNull()?:0.0);reload()},label={Text(t.name)},singleLine=true,modifier=Modifier.fillMaxWidth())
+    OutlinedTextField(
+     value=budgetInputs[t.name]?:if(budget==0.0)"" else budget.toString(),
+     onValueChange={v->budgetInputs=budgetInputs+(t.name to v);v.replace(',','.').toDoubleOrNull()?.let{store.set(monthKey(selectedMonth),t.name,it);values=values+(t.name to it)}},
+     label={Text(t.name)},
+     singleLine=true,
+     keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),
+     modifier=Modifier.fillMaxWidth()
+    )
     if(budget>0){
      Text("Effettivo: ${money.format(actual)} · ${(pct*100).toInt()}%",color=when{pct>=1.0->NegativeColor;pct>=0.8->androidx.compose.ui.graphics.Color(0xFFF9A825);else->PositiveColor})
     }
