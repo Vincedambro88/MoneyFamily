@@ -44,10 +44,9 @@ class PremiumBilling(
 
     fun launchPurchase(activity: Activity): Boolean {
         val product = productDetails ?: return false
-        val offer = product.oneTimePurchaseOfferDetails ?: return false
+        product.oneTimePurchaseOfferDetails ?: return false
         val params = BillingFlowParams.ProductDetailsParams.newBuilder()
             .setProductDetails(product)
-            .setOfferToken(offer.offerToken)
             .build()
         billingClient.launchBillingFlow(
             activity,
