@@ -221,7 +221,7 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
  ){uri->
   if(uri!=null)scope.launch{
    runCatching{
-    ExcelExporter.write(context,uri,filtered)
+    ExcelExporter.write(context,uri,base)
     exportStatus="Operazioni esportate in Excel"
    }.onFailure{
     exportStatus="Errore esportazione: "+(it.message?:"operazione non riuscita")
