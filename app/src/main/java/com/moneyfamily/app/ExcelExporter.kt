@@ -31,7 +31,7 @@ object ExcelExporter {
     }
 
     private fun sheet(rows: List<List<String>>): String {
-        fun esc(v: String) = v.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace(""", "&quot;")
+        fun esc(v: String) = v.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
         fun col(n: Int): String { var x = n + 1; var s = ""; while (x > 0) { val r = (x - 1) % 26; s = ('A'.code + r).toChar() + s; x = (x - 1) / 26 }; return s }
         return buildString {
             append("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData>")
