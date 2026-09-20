@@ -499,35 +499,83 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
  if(!isPremium){
   Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
    Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Confronto mese/anno dei costi reali",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));Text("PREMIUM",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)}
-    Text("Confronta i costi reali per tipologia o categoria tra il periodo selezionato e quello precedente.",style=MaterialTheme.typography.bodyMedium)
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Confronto costi effettivi",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));Text("PREMIUM",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)}
+    Text("Confronta due mesi specifici oppure due anni, per tipologia o categoria.",style=MaterialTheme.typography.bodyMedium)
    }
   }
   return
  }
- var period by remember{mutableStateOf("Mese")}
+ var mode by remember{mutableStateOf("Mese")}
  var dimension by remember{mutableStateOf("Tipologia")}
- val previous=if(period=="Mese")shift(month,-1) else (month.clone() as Calendar).apply{add(Calendar.YEAR,-1)}
- val currentItems=if(period=="Mese")data.filter{same(it.date,month)} else data.filter{parse(it.date)?.get(Calendar.YEAR)==month.get(Calendar.YEAR)}
- val previousItems=if(period=="Mese")data.filter{same(it.date,previous)} else data.filter{parse(it.date)?.get(Calendar.YEAR)==previous.get(Calendar.YEAR)}
+ var firstMonth by remember{mutableStateOf(month.clone() as Calendar)}
+ var secondMonth by remember{mutableStateOf(shift(month,-1))}
+ var firstYear by remember{mutableStateOf(month.get(Calendar.YEAR))}
+ var secondYear by remember{mutableStateOf(month.get(Calendar.YEAR)-1)}
+
  fun key(x:UiMovement)=if(dimension=="Tipologia")x.typeName.ifBlank{"Da classificare"} else x.category.ifBlank{"Non classificata"}
- fun costs(items:List<UiMovement>)=items.filter{it.amount<0}.groupBy(::key).mapValues{(_,v)->-v.sumOf{it.amount}}
- val cur=costs(currentItems);val prev=costs(previousItems)
- val keys=(cur.keys+prev.keys).distinct().sorted()
+ fun actual(items:List<UiMovement>)=items.groupBy(::key).mapValues{(_,v)->-v.sumOf{it.amount}}
+ val firstItems=if(mode=="Mese")data.filter{same(it.date,firstMonth)}else data.filter{parse(it.date)?.get(Calendar.YEAR)==firstYear}
+ val secondItems=if(mode=="Mese")data.filter{same(it.date,secondMonth)}else data.filter{parse(it.date)?.get(Calendar.YEAR)==secondYear}
+ val first=actual(firstItems)
+ val second=actual(secondItems)
+ val keys=(first.keys+second.keys).distinct().sorted()
+ val firstLabel=if(mode=="Mese")mf.format(firstMonth.time) else firstYear.toString()
+ val secondLabel=if(mode=="Mese")mf.format(secondMonth.time) else secondYear.toString()
+
  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
   Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-   Text("Confronto mese/anno dei costi reali",style=MaterialTheme.typography.titleLarge)
+   Text("Confronto costi effettivi",style=MaterialTheme.typography.titleLarge)
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-    listOf("Mese","Anno").forEach{p->FilterChip(selected=period==p,onClick={period=p},label={Text(p)})}
-    listOf("Tipologia","Categoria").forEach{d->FilterChip(selected=dimension==d,onClick={dimension=d},label={Text(d)})}
+    FilterChip(selected=mode=="Mese",onClick={mode="Mese"},label={Text("Mese / Mese")},modifier=Modifier.weight(1f))
+    FilterChip(selected=mode=="Anno",onClick={mode="Anno"},label={Text("Anno / Anno")},modifier=Modifier.weight(1f))
    }
-   Text(if(period=="Mese")"${mf.format(month.time)} vs ${mf.format(previous.time)}" else "${month.get(Calendar.YEAR)} vs ${previous.get(Calendar.YEAR)}",style=MaterialTheme.typography.labelLarge)
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+    FilterChip(selected=dimension=="Tipologia",onClick={dimension="Tipologia"},label={Text("Tipologia")},modifier=Modifier.weight(1f))
+    FilterChip(selected=dimension=="Categoria",onClick={dimension="Categoria"},label={Text("Categoria")},modifier=Modifier.weight(1f))
+   }
+   if(mode=="Mese"){
+    Text("Periodo 1",style=MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={firstMonth=shift(firstMonth,-1)},modifier=Modifier.weight(1f)){Text("‹")}
+     Text(firstLabel,modifier=Modifier.weight(3f),style=MaterialTheme.typography.bodyLarge)
+     OutlinedButton(onClick={firstMonth=shift(firstMonth,1)},modifier=Modifier.weight(1f)){Text("›")}
+    }
+    Text("Periodo 2",style=MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={secondMonth=shift(secondMonth,-1)},modifier=Modifier.weight(1f)){Text("‹")}
+     Text(secondLabel,modifier=Modifier.weight(3f),style=MaterialTheme.typography.bodyLarge)
+     OutlinedButton(onClick={secondMonth=shift(secondMonth,1)},modifier=Modifier.weight(1f)){Text("›")}
+    }
+   }else{
+    Text("Periodo 1",style=MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={firstYear-=1},modifier=Modifier.weight(1f)){Text("‹")}
+     Text(firstYear.toString(),modifier=Modifier.weight(3f),style=MaterialTheme.typography.bodyLarge)
+     OutlinedButton(onClick={firstYear+=1},modifier=Modifier.weight(1f)){Text("›")}
+    }
+    Text("Periodo 2",style=MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={secondYear-=1},modifier=Modifier.weight(1f)){Text("‹")}
+     Text(secondYear.toString(),modifier=Modifier.weight(3f),style=MaterialTheme.typography.bodyLarge)
+     OutlinedButton(onClick={secondYear+=1},modifier=Modifier.weight(1f)){Text("›")}
+    }
+   }
+   Text("${firstLabel} vs ${secondLabel}",style=MaterialTheme.typography.labelLarge)
    if(keys.isEmpty()) Text("Nessun costo disponibile.")
    else keys.forEach{label->
-    val a=cur[label]?:0.0;val b=prev[label]?:0.0;val delta=a-b
+    val a=first[label]?:0.0
+    val b=second[label]?:0.0
+    val delta=a-b
+    val pct=if(b!=0.0)delta/b*100.0 else null
     Column(verticalArrangement=Arrangement.spacedBy(3.dp)){
-     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(label,modifier=Modifier.weight(1f));Text(money.format(a));Text("Δ "+money.format(delta),color=if(delta>0)NegativeColor else PositiveColor)}
-     Text("Periodo precedente: "+money.format(b),style=MaterialTheme.typography.labelSmall)
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
+      Text(label,modifier=Modifier.weight(1f))
+      Text(money.format(a))
+     }
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
+      Text("${secondLabel}: ${money.format(b)}",style=MaterialTheme.typography.labelSmall)
+      Text("Δ ${money.format(delta)}"+(pct?.let{" · ${String.format(Locale.ITALY,"%.1f%%",it)}"}?:""),color=if(delta>0)NegativeColor else if(delta<0)PositiveColor else MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.labelSmall)
+     }
     }
    }
   }
@@ -577,4 +625,3 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
   }}}
  }
 }
-
