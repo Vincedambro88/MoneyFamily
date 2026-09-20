@@ -2,7 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("com.google.devtools.ksp")
+    id("com.google.devtools.ksp") version "2.0.21-1.0.28"
 }
 
 android {
@@ -43,5 +43,5 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("com.android.billingclient:billing-ktx:8.3.0")
+    implementation("com.android.billingclient:billing-ktx:7.1.1")
 }
