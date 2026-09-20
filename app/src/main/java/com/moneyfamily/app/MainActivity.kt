@@ -303,7 +303,7 @@ private val ChartColors=listOf(
  if(confirmDelete) AlertDialog(
   onDismissRequest={confirmDelete=false},
   title={Text(if(annual)"Cancella operazioni dell'anno" else "Cancella operazioni")},
-  text={Text(if(annual)"Vuoi eliminare tutte le operazioni del $year? Questa operazione non può essere annullata." else "Vuoi eliminare tutte le operazioni di ${mf.format(month.time)}? Questa operazione non può essere annullata.")},
+  text={Text(if(annual)"Vuoi eliminare tutte le operazioni del $year? Questa operazione non può essere annullata." else "Vuoi eliminare tutte le operazioni di ${mf.format(operationMonth.time)}? Questa operazione non può essere annullata.")},
   confirmButton={TextButton(onClick={confirmDelete=false;deletePeriod(operationMonth,annual)}){Text("Cancella")}},
   dismissButton={TextButton(onClick={confirmDelete=false}){Text("Annulla")}}
  )
