@@ -3,7 +3,7 @@ name: Build MoneyFamily AAB + APK
 on:
   workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "premium-test" ]
 
 permissions:
   contents: read
