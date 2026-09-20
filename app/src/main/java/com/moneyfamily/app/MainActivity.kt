@@ -186,12 +186,17 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
  data:List<UiMovement>, types:List<TypeEntity>, cats:List<CategoryEntity>, members:List<FamilyMemberEntity>,
  month:Calendar, prev:()->Unit, next:()->Unit, edit:(UiMovement)->Unit, remove:(UiMovement)->Unit, deletePeriod:(Calendar)->Unit
 ){
+ val context=LocalContext.current
+ val scope=rememberCoroutineScope()
  var q by remember{mutableStateOf("")}; var confirmDelete by remember{mutableStateOf(false)}
+ var exportStatus by remember{mutableStateOf("")}
+ val exportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")){uri->if(uri!=null)scope.launch{runCatching{ExcelExporter.write(context,uri,data);exportStatus="Operazioni esportate in Excel"}.onFailure{exportStatus="Errore esportazione: "+(it.message?:"operazione non riuscita")}}}
  var type by remember{mutableStateOf("")}; var cat by remember{mutableStateOf("")}; var member by remember{mutableStateOf("")}; var kind by remember{mutableStateOf("")}
  val filtered=data.filter{same(it.date,month)&&it.description.contains(q,true)&&(type.isBlank()||it.typeName==type)&&(cat.isBlank()||it.category==cat)&&(member.isBlank()||it.member==member)&&(kind.isBlank()||(kind=="Spese"&&it.amount<0)||(kind=="Ricavi"&&it.amount>0))}
  Column(Modifier.fillMaxSize().padding(16.dp)){
   MonthBar(mf.format(month.time),prev,next)
   OutlinedButton(onClick={confirmDelete=true},modifier=Modifier.fillMaxWidth()){Text("Cancella tutte le operazioni del periodo")}
+  if(exportStatus.isNotBlank())Text(exportStatus,color=if(exportStatus.startsWith("Errore"))NegativeColor else PositiveColor)
   OutlinedTextField(value=q,onValueChange={q=it},label={Text("Cerca descrizione")},modifier=Modifier.fillMaxWidth())
   Choice("Tipologia",type.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+types.map{it.name}){type=if(it=="Tutte")"" else it}
   Choice("Categoria",cat.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+cats.map{it.name}){cat=if(it=="Tutte")"" else it}
@@ -245,7 +250,6 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
   onImported()
   status="Importate ${rows.size} operazioni"
  }.onFailure{status="Errore importazione: ${it.message?:"file non valido"}"}}}
- val exportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")){uri->if(uri!=null)scope.launch{runCatching{ExcelExporter.write(context,uri,data);status="Operazioni esportate in Excel"}.onFailure{status="Errore esportazione: "+(it.message?:"operazione non riuscita")}}}
  val templateLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")){uri->if(uri!=null)scope.launch{runCatching{ExcelTemplate.write(context,uri);status="Modello Excel salvato"}.onFailure{status="Errore salvataggio: ${it.message?:"operazione non riuscita"}"}}}
  Column(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
   Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){TextButton(onClick=onBack){Text("← Indietro")};Spacer(Modifier.weight(1f));Text("Inserisci",style=MaterialTheme.typography.headlineSmall)}
