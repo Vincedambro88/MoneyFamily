@@ -418,7 +418,7 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
  val previousItems=if(period=="Mese")data.filter{same(it.date,previous)} else data.filter{parse(it.date)?.get(Calendar.YEAR)==previous.get(Calendar.YEAR)}
  fun key(x:UiMovement)=if(dimension=="Tipologia")x.typeName.ifBlank{"Da classificare"} else x.category.ifBlank{"Non classificata"}
  fun costs(items:List<UiMovement>)=items.filter{it.amount<0}.groupBy(::key).mapValues{(_,v)->-v.sumOf{it.amount}}
- val cur=costs(currentItems);val prev=costs(previous)
+ val cur=costs(currentItems);val prev=costs(previousItems)
  val keys=(cur.keys+prev.keys).distinct().sorted()
  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
   Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
