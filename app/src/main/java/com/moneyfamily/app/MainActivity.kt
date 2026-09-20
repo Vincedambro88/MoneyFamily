@@ -133,6 +133,18 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
 
 private val PositiveColor=androidx.compose.ui.graphics.Color(0xFF2E7D32)
 private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
+private val ChartColors=listOf(
+ androidx.compose.ui.graphics.Color(0xFF2563EB),
+ androidx.compose.ui.graphics.Color(0xFF7C3AED),
+ androidx.compose.ui.graphics.Color(0xFF0891B2),
+ androidx.compose.ui.graphics.Color(0xFFF59E0B),
+ androidx.compose.ui.graphics.Color(0xFF16A34A),
+ androidx.compose.ui.graphics.Color(0xFFDB2777),
+ androidx.compose.ui.graphics.Color(0xFFEA580C),
+ androidx.compose.ui.graphics.Color(0xFF4F46E5),
+ androidx.compose.ui.graphics.Color(0xFF0F766E),
+ androidx.compose.ui.graphics.Color(0xFF9333EA)
+)
 
 @Composable private fun MetricCard(title:String,value:Double,modifier:Modifier){
  Card(modifier,shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(horizontal=14.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(title,style=MaterialTheme.typography.labelLarge);Text(money.format(value),style=MaterialTheme.typography.titleMedium,color=if(value<0)NegativeColor else PositiveColor)}}
@@ -152,7 +164,7 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
        var start=0f
        nonZero.forEachIndexed{index,entry->
         val sweep=(abs(entry.second)/total*360.0).toFloat()
-        drawArc(color=if(entry.second<0)NegativeColor else PositiveColor,startAngle=start,sweepAngle=sweep,useCenter=false,style=androidx.compose.ui.graphics.drawscope.Stroke(width=42f,cap=androidx.compose.ui.graphics.StrokeCap.Butt))
+        drawArc(color=ChartColors[index%ChartColors.size],startAngle=start,sweepAngle=sweep,useCenter=false,style=androidx.compose.ui.graphics.drawscope.Stroke(width=42f,cap=androidx.compose.ui.graphics.StrokeCap.Butt))
         start+=sweep
        }
       }
@@ -164,7 +176,7 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
      Spacer(Modifier.width(16.dp))
      Column(Modifier.weight(1f).height(170.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
       nonZero.forEachIndexed{index,entry->
-       val color=if(entry.second<0)NegativeColor else PositiveColor
+       val color=ChartColors[index%ChartColors.size]
        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
         Box(Modifier.size(11.dp).clip(RoundedCornerShape(50)).background(color))
         Column(Modifier.weight(1f)){
@@ -182,9 +194,9 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
 
 @Composable private fun LegendRow(name:String,value:Double,color:androidx.compose.ui.graphics.Color){Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)){Box(Modifier.size(11.dp).clip(RoundedCornerShape(50)).background(color));Column{Text(name,style=MaterialTheme.typography.labelLarge);Text(money.format(value),style=MaterialTheme.typography.bodyMedium,color=color)}}}
 
-@Composable private fun BarChartCard(title:String,values:List<Pair<String,Double>>){Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){Text(title,style=MaterialTheme.typography.titleLarge);if(values.isEmpty())Text("Nessun dato per il mese")else{val maxAbs=values.maxOf{abs(it.second)}.coerceAtLeast(1.0);values.forEach{(n,v)->BarChartRow(n,v,maxAbs)}}}}}
+@Composable private fun BarChartCard(title:String,values:List<Pair<String,Double>>){Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){Text(title,style=MaterialTheme.typography.titleLarge);if(values.isEmpty())Text("Nessun dato per il mese")else{val maxAbs=values.maxOf{abs(it.second)}.coerceAtLeast(1.0);values.forEachIndexed{index,(n,v)->BarChartRow(n,v,maxAbs,index)}}}}}
 
-@Composable private fun BarChartRow(name:String,value:Double,maxAbs:Double){val fraction=(abs(value)/maxAbs).toFloat().coerceIn(0f,1f);val color=if(value<0)NegativeColor else PositiveColor;Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(5.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(name,Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge);Text(money.format(value),color=color,style=MaterialTheme.typography.bodyLarge)};Box(Modifier.fillMaxWidth().height(22.dp).clip(RoundedCornerShape(11.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha=.55f))){if(fraction>0)Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().clip(RoundedCornerShape(11.dp)).background(color))}}}
+@Composable private fun BarChartRow(name:String,value:Double,maxAbs:Double,index:Int){val fraction=(abs(value)/maxAbs).toFloat().coerceIn(0f,1f);val color=ChartColors[index%ChartColors.size];Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(5.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(name,Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge);Text(money.format(value),color=color,style=MaterialTheme.typography.bodyLarge)};Box(Modifier.fillMaxWidth().height(22.dp).clip(RoundedCornerShape(11.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha=.55f))){if(fraction>0)Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().clip(RoundedCornerShape(11.dp)).background(color))}}}
 
 @Composable private fun Operations(
  data:List<UiMovement>, types:List<TypeEntity>, cats:List<CategoryEntity>, members:List<FamilyMemberEntity>,
