@@ -548,8 +548,8 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
  var values by remember{mutableStateOf<Map<String,Double>>(emptyMap())}
  fun reload(){values=store.get(monthKey(selectedMonth))}
  LaunchedEffect(selectedMonth.timeInMillis,types){reload()}
- val actualByType=data.filter{same(it.date,selectedMonth)&&it.amount<0}.groupBy{it.typeName}.mapValues{(_,v)->-v.sumOf{it.amount}}
- val actualByCategory=data.filter{same(it.date,selectedMonth)&&it.amount<0}.groupBy{it.category.ifBlank{"Non classificata"}}.mapValues{(_,v)->-v.sumOf{it.amount}}
+ val actualByType=data.filter{same(it.date,selectedMonth)}.groupBy{it.typeName}.mapValues{(_,v)->-v.sumOf{it.amount}}
+ val actualByCategory=data.filter{same(it.date,selectedMonth)}.groupBy{it.category.ifBlank{"Non classificata"}}.mapValues{(_,v)->-v.sumOf{it.amount}}
  LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
   item{Text("Budget",style=MaterialTheme.typography.headlineSmall)}
   item{MonthBar(mf.format(selectedMonth.time),{selectedMonth=shift(selectedMonth,-1)},{selectedMonth=shift(selectedMonth,1)})}
