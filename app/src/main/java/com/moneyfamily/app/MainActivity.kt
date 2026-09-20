@@ -176,9 +176,41 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
 
 @Composable private fun BarChartRow(name:String,value:Double,maxAbs:Double){val fraction=(abs(value)/maxAbs).toFloat().coerceIn(0f,1f);val color=if(value<0)NegativeColor else PositiveColor;Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(5.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(name,Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge);Text(money.format(value),color=color,style=MaterialTheme.typography.bodyLarge)};Box(Modifier.fillMaxWidth().height(22.dp).clip(RoundedCornerShape(11.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha=.55f))){if(fraction>0)Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().clip(RoundedCornerShape(11.dp)).background(color))}}}
 
-@Composable private fun Operations(data:List<UiMovement>,types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,month:Calendar,prev:()->Unit,next:()->Unit,edit:(UiMovement)->Unit,remove:(UiMovement)->Unit,deletePeriod:(Calendar)->Unit){var q by remember{mutableStateOf("")};var confirmDelete by remember{mutableStateOf(false)};var type by remember{mutableStateOf("")};var cat by remember{mutableStateOf("")};var member by remember{mutableStateOf("")};var kind by remember{mutableStateOf("")};val filtered=data.filter{same(it.date,month)&&it.description.contains(q,true)&&(type.isBlank()||it.typeName==type)&&(cat.isBlank()||it.category==cat)&&(member.isBlank()||it.member==member)&&(kind.isBlank()||(kind=="Spese"&&it.amount<0)||(kind=="Ricavi"&&it.amount>0))};Column(Modifier.fillMaxSize().padding(16.dp)){MonthBar(mf.format(month.time),prev,next);OutlinedButton(onClick={confirmDelete=true},modifier=Modifier.fillMaxWidth()){Text("Cancella tutte le operazioni del periodo")};OutlinedTextField(value=q,onValueChange={q=it},label={Text("Cerca descrizione")},modifier=Modifier.fillMaxWidth());Choice("Tipologia",type.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+types.map{it.name}){type=if(it=="Tutte")"" else it};Choice("Categoria",cat.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+cats.map{it.name}){cat=if(it=="Tutte")"" else it};Choice("Componente",member.ifBlank{"Tutti"},LocalContext.current,listOf("Tutti")+members.map{it.name}){member=if(it=="Tutti")"" else it};Choice("Tipo",kind.ifBlank{"Tutti"},LocalContext.current,listOf("Tutti","Spese","Ricavi")){kind=if(it=="Tutti")"" else it};LazyColumn(verticalArrangement=Arrangement.spacedBy(6.dp)){items(filtered.sortedByDescending{parse(it.date)?.timeInMillis?:0L}){x->Card(Modifier.fillMaxWidth()){Column(Modifier.padding(12.dp)){Text(x.description.ifBlank{x.type.name},style=MaterialTheme.typography.titleMedium);Text("${x.typeName.ifBlank{"Non classificata"}} • ${x.category} • ${x.member} • ${x.date}");Text(money.format(x.amount));Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){TextButton(onClick={edit(x)}){Text("Modifica")};TextButton(onClick={remove(x)}){Text("Elimina")}}}}}}}}
-
- if(confirmDelete) AlertDialog(onDismissRequest={confirmDelete=false},title={Text("Cancella operazioni")},text={Text("Vuoi eliminare tutte le operazioni di ${mf.format(month.time)}? Questa operazione non può essere annullata.")},confirmButton={TextButton(onClick={confirmDelete=false;deletePeriod(month)}){Text("Cancella")}},dismissButton={TextButton(onClick={confirmDelete=false}){Text("Annulla")}})
+@Composable private fun Operations(
+ data:List<UiMovement>, types:List<TypeEntity>, cats:List<CategoryEntity>, members:List<FamilyMemberEntity>,
+ month:Calendar, prev:()->Unit, next:()->Unit, edit:(UiMovement)->Unit, remove:(UiMovement)->Unit, deletePeriod:(Calendar)->Unit
+){
+ var q by remember{mutableStateOf("")}; var confirmDelete by remember{mutableStateOf(false)}
+ var type by remember{mutableStateOf("")}; var cat by remember{mutableStateOf("")}; var member by remember{mutableStateOf("")}; var kind by remember{mutableStateOf("")}
+ val filtered=data.filter{same(it.date,month)&&it.description.contains(q,true)&&(type.isBlank()||it.typeName==type)&&(cat.isBlank()||it.category==cat)&&(member.isBlank()||it.member==member)&&(kind.isBlank()||(kind=="Spese"&&it.amount<0)||(kind=="Ricavi"&&it.amount>0))}
+ Column(Modifier.fillMaxSize().padding(16.dp)){
+  MonthBar(mf.format(month.time),prev,next)
+  OutlinedButton(onClick={confirmDelete=true},modifier=Modifier.fillMaxWidth()){Text("Cancella tutte le operazioni del periodo")}
+  OutlinedTextField(value=q,onValueChange={q=it},label={Text("Cerca descrizione")},modifier=Modifier.fillMaxWidth())
+  Choice("Tipologia",type.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+types.map{it.name}){type=if(it=="Tutte")"" else it}
+  Choice("Categoria",cat.ifBlank{"Tutte"},LocalContext.current,listOf("Tutte")+cats.map{it.name}){cat=if(it=="Tutte")"" else it}
+  Choice("Componente",member.ifBlank{"Tutti"},LocalContext.current,listOf("Tutti")+members.map{it.name}){member=if(it=="Tutti")"" else it}
+  Choice("Tipo",kind.ifBlank{"Tutti"},LocalContext.current,listOf("Tutti","Spese","Ricavi")){kind=if(it=="Tutti")"" else it}
+  LazyColumn(verticalArrangement=Arrangement.spacedBy(6.dp)){
+   items(filtered.sortedByDescending{parse(it.date)?.timeInMillis?:0L}){x->
+    Card(Modifier.fillMaxWidth()){Column(Modifier.padding(12.dp)){
+     Text(x.description.ifBlank{x.type.name},style=MaterialTheme.typography.titleMedium)
+     Text("${x.typeName.ifBlank{"Non classificata"}} • ${x.category} • ${x.member} • ${x.date}")
+     Text(money.format(x.amount))
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
+      TextButton(onClick={edit(x)}){Text("Modifica")}; TextButton(onClick={remove(x)}){Text("Elimina")}
+     }
+    }}
+   }
+  }
+ }
+ if(confirmDelete) AlertDialog(
+  onDismissRequest={confirmDelete=false},
+  title={Text("Cancella operazioni")},
+  text={Text("Vuoi eliminare tutte le operazioni di ${mf.format(month.time)}? Questa operazione non può essere annullata.")},
+  confirmButton={TextButton(onClick={confirmDelete=false;deletePeriod(month)}){Text("Cancella")}},
+  dismissButton={TextButton(onClick={confirmDelete=false}){Text("Annulla")}}
+ )
 }
 
 @Composable private fun Editor(old:UiMovement?,types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,cancel:()->Unit,save:(UiMovement)->Unit){val c=LocalContext.current;var amount by remember(old){mutableStateOf(old?.amount?.toString()?:"")};var desc by remember(old){mutableStateOf(old?.description?:"")};var date by remember(old){mutableStateOf(old?.date?:df.format(Date()))};var type by remember(old){mutableStateOf(old?.typeName?.takeIf{it.isNotBlank() && !it.equals("EXPENSE",true)}?:"")};var category by remember(old){mutableStateOf(old?.category?:"")};var member by remember(old){mutableStateOf(old?.member?:"")};LaunchedEffect(types,members,old){if(old==null){if(type.isBlank())type=types.firstOrNull()?.name?:"";if(member.isBlank())member=members.firstOrNull()?.name?:""}};LaunchedEffect(type,links,cats){if(old==null&&type.isNotBlank()){val t=types.find{it.name==type};val l=links.find{it.typeId==t?.id};if(l!=null)category=cats.find{it.id==l.categoryId}?.name?:category}};AlertDialog(onDismissRequest=cancel,title={Text(if(old==null)"Nuova operazione" else "Modifica operazione")},text={Column(verticalArrangement=Arrangement.spacedBy(7.dp)){OutlinedTextField(value=amount,onValueChange={amount=it},label={Text("Importo (+ ricavo / - spesa)")},modifier=Modifier.fillMaxWidth());Choice("Tipologia",type.ifBlank{"Seleziona"},c,types.filter{it.active}.map{it.name}){type=it};Choice("Categoria",category.ifBlank{"Seleziona"},c,cats.filter{it.active}.map{it.name}){category=it};Choice("Effettuata da",member.ifBlank{"Seleziona"},c,members.filter{it.active||it.name==old?.member}.map{it.name}){member=it};OutlinedTextField(value=desc,onValueChange={desc=it},label={Text("Descrizione")},modifier=Modifier.fillMaxWidth());OutlinedButton(onClick={val x=parse(date)?:Calendar.getInstance();DatePickerDialog(c,{_,y,m,d->x.set(y,m,d);date=df.format(x.time)},x.get(Calendar.YEAR),x.get(Calendar.MONTH),x.get(Calendar.DAY_OF_MONTH)).show()}){Text("Data $date")}}},confirmButton={TextButton(enabled=amount.replace(',','.').toDoubleOrNull()!=null&&type.isNotBlank()&&category.isNotBlank()&&member.isNotBlank(),onClick={val a=amount.replace(',','.').toDouble();save(UiMovement(old?.id?:System.currentTimeMillis(),if(a<0)MovementType.EXPENSE else MovementType.INCOME,a,category,desc,date,member,type))}){Text("Salva")}},dismissButton={TextButton(onClick=cancel){Text("Annulla")}})}
