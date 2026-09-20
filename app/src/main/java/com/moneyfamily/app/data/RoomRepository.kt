@@ -18,6 +18,7 @@ class RoomRepository(private val context: Context) {
     suspend fun insert(item: Movement) = dao.insert(item.toEntity())
     suspend fun update(item: Movement) = dao.update(item.toEntity())
     suspend fun delete(item: Movement) = dao.delete(item.toEntity())
+    suspend fun deleteAll(items: List<Movement>) { items.forEach { dao.delete(it.toEntity()) } }
 
     suspend fun allTypes(): List<TypeEntity> { seedDefaults(); return types.active() }
     suspend fun activeTypes(): List<TypeEntity> { seedDefaults(); return types.active() }

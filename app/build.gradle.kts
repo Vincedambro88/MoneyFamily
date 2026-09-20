@@ -9,7 +9,7 @@ android {
     namespace = "com.moneyfamily.app"
     compileSdk = 36
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-    defaultConfig { applicationId = "com.vdapps.moneyfamily"; minSdk = 26; targetSdk = 36; versionCode = 6; versionName = "1.0.1" }
+    defaultConfig { applicationId = "com.vdapps.moneyfamily"; minSdk = 26; targetSdk = 36; versionCode = 7; versionName = "1.1.0" }
 
     signingConfigs {
         create("release") {
@@ -43,4 +43,5 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation("com.android.billingclient:billing-ktx:9.1.0")
 }
