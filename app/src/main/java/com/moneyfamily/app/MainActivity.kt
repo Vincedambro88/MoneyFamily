@@ -191,6 +191,7 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
  month:Calendar, prev:()->Unit, next:()->Unit, edit:(UiMovement)->Unit, remove:(UiMovement)->Unit,
  deletePeriod:(Calendar,Boolean)->Unit
 ){
+ var operationMonth by remember(month.timeInMillis){mutableStateOf(month.clone() as Calendar)}
  val context=LocalContext.current
  val scope=rememberCoroutineScope()
  var annual by remember{mutableStateOf(false)}
@@ -202,8 +203,8 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
  var member by remember{mutableStateOf("")}
  var kind by remember{mutableStateOf("")}
 
- val year=month.get(Calendar.YEAR)
- val base=if(annual)data.filter{parse(it.date)?.get(Calendar.YEAR)==year}else data.filter{same(it.date,month)}
+ val year=operationMonth.get(Calendar.YEAR)
+ val base=if(annual)data.filter{parse(it.date)?.get(Calendar.YEAR)==year}else data.filter{same(it.date,operationMonth)}
  val filtered=base.filter{
   it.description.contains(q,true) &&
   (type.isBlank()||it.typeName==type) &&
@@ -236,12 +237,12 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
   }
   if(annual){
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
-    OutlinedButton(onClick={month=shift(month,-12)}){Text("‹")}
+    OutlinedButton(onClick={operationMonth=shift(operationMonth,-12)}){Text("‹")}
     Text("Riepilogo $year",style=MaterialTheme.typography.titleLarge)
-    OutlinedButton(onClick={month=shift(month,12)}){Text("›")}
+    OutlinedButton(onClick={operationMonth=shift(operationMonth,12)}){Text("›")}
    }
   }else{
-   MonthBar(mf.format(month.time),prev,next)
+   MonthBar(mf.format(operationMonth.time),{operationMonth=shift(operationMonth,-1)},{operationMonth=shift(operationMonth,1)})
   }
 
   Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
@@ -255,7 +256,7 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
   OutlinedButton(onClick={confirmDelete=true},modifier=Modifier.fillMaxWidth()){
    Text(if(annual)"Cancella tutte le operazioni dell'anno $year" else "Cancella tutte le operazioni del periodo")
   }
-  OutlinedButton(onClick={exportLauncher.launch("MoneyFamily_Operazioni_${if(annual)year else mf.format(month.time)}.xlsx")},modifier=Modifier.fillMaxWidth()){
+  OutlinedButton(onClick={exportLauncher.launch("MoneyFamily_Operazioni_${if(annual)year else mf.format(operationMonth.time)}.xlsx")},modifier=Modifier.fillMaxWidth()){
    Text("Scarica in Excel")
   }
   if(exportStatus.isNotBlank())Text(exportStatus,color=if(exportStatus.startsWith("Errore"))NegativeColor else PositiveColor)
@@ -291,7 +292,7 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
   onDismissRequest={confirmDelete=false},
   title={Text(if(annual)"Cancella operazioni dell'anno" else "Cancella operazioni")},
   text={Text(if(annual)"Vuoi eliminare tutte le operazioni del $year? Questa operazione non può essere annullata." else "Vuoi eliminare tutte le operazioni di ${mf.format(month.time)}? Questa operazione non può essere annullata.")},
-  confirmButton={TextButton(onClick={confirmDelete=false;deletePeriod(month,annual)}){Text("Cancella")}},
+  confirmButton={TextButton(onClick={confirmDelete=false;deletePeriod(operationMonth,annual)}){Text("Cancella")}},
   dismissButton={TextButton(onClick={confirmDelete=false}){Text("Annulla")}}
  )
 }
@@ -300,7 +301,7 @@ private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
 
 
 @Composable private fun AnnualSummaryCard(data:List<UiMovement>,month:Calendar){
- val year=month.get(Calendar.YEAR);val yearly=data.filter{parse(it.date)?.get(Calendar.YEAR)==year};val income=yearly.filter{it.amount>0}.sumOf{it.amount};val expense=yearly.filter{it.amount<0}.sumOf{it.amount};val balance=income+expense
+ val year=operationMonth.get(Calendar.YEAR);val yearly=data.filter{parse(it.date)?.get(Calendar.YEAR)==year};val income=yearly.filter{it.amount>0}.sumOf{it.amount};val expense=yearly.filter{it.amount<0}.sumOf{it.amount};val balance=income+expense
  val monthly=(0..11).map{m->m to yearly.filter{parse(it.date)?.get(Calendar.MONTH)==m}.sumOf{it.amount}}
  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){Text("Riepilogo esercizio $year",style=MaterialTheme.typography.titleLarge);Text("${yearly.size} operazioni",style=MaterialTheme.typography.labelMedium)}
