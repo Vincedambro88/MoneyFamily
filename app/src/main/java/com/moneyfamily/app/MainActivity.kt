@@ -350,7 +350,7 @@ private fun ChoiceDialog(c:Context,title:String,opts:List<String>,pick:(String)-
 @Composable private fun Choice(label:String,value:String,c:Context,opts:List<String>,pick:(String)->Unit){OutlinedButton(onClick={ChoiceDialog(c,label,opts,pick)},modifier=Modifier.fillMaxWidth()){Text("$label: $value")}}
 @Composable private fun MonthBar(label:String,prev:()->Unit,next:()->Unit){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){OutlinedButton(onClick=prev){Text("‹")};Text(label,Modifier.padding(top=10.dp));OutlinedButton(onClick=next){Text("›")}}}
 private fun shift(c:Calendar,d:Int)=(c.clone() as Calendar).apply{add(Calendar.MONTH,d)}
-private fun parse(s:String)=runCatching{df.parse(s)?.let{Calendar.getInstance().apply{time=it}}}.getOrNull()
+fun parse(s:String)=runCatching{df.parse(s)?.let{Calendar.getInstance().apply{time=it}}}.getOrNull()
 private fun same(s:String,c:Calendar):Boolean{val d=parse(s)?:return false;return d.get(Calendar.YEAR)==c.get(Calendar.YEAR)&&d.get(Calendar.MONTH)==c.get(Calendar.MONTH)}
 private fun Movement.ui()=UiMovement(id,type,amount,category,description,date,member,typeName)
 private fun UiMovement.model()=Movement(id,type,amount,category,description,date,member,"",typeName)
