@@ -22,7 +22,10 @@ class SupabaseRepository(
     }
 
     suspend fun signUp(email: String, password: String): String? = withContext(Dispatchers.IO) {
-        client.auth.signUpWith(Email) {
+        client.auth.signUpWith(
+            Email,
+            redirectUrl = SupabaseClientProvider.AUTH_REDIRECT_URL
+        ) {
             this.email = email.trim()
             this.password = password
         }
@@ -70,7 +73,7 @@ class SupabaseRepository(
         ).decodeSingle<String>()
     }
 
-suspend fun isPremiumForCurrentFamily(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun isPremiumForCurrentFamily(): Boolean = withContext(Dispatchers.IO) {
         val family = familiesForCurrentUser().firstOrNull() ?: return@withContext false
         client.postgrest.rpc(
             "family_has_active_premium",
