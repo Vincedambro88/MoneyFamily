@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import kotlin.math.abs
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import io.github.jan.supabase.auth.handleDeeplinks
 import com.moneyfamily.app.data.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
