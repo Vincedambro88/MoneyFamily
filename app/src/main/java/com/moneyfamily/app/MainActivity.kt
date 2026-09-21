@@ -70,16 +70,11 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
         },
         onPremiumChanged = {
             isPremium = true
-            scope.launch {
-                if (SupabaseClientProvider.isConfigured) {
-                    isPremium = supabaseRepo.isPremiumForCurrentFamily()
-                }
-            }
         }
     )
 }
  fun refresh(){scope.launch{data=repo.all().map{it.ui()};types=repo.allTypes();cats=repo.allCategories();members=repo.allMembers();links=repo.allMappings()}}
- LaunchedEffect(Unit){premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{isPremium=supabaseRepo.isPremiumForCurrentFamily();cloudSync.sync().onSuccess{refresh()}}}else{isPremium=premiumBilling.isPremium()}}
+ LaunchedEffect(Unit){premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{isPremium=supabaseRepo.isPremiumForCurrentFamily() || premiumBilling.isPremium();cloudSync.sync().onSuccess{refresh()}}}else{isPremium=premiumBilling.isPremium()}}
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
  fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh();if(SupabaseClientProvider.isConfigured)cloudSync.sync().onSuccess{refresh()}}}
  fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh();if(SupabaseClientProvider.isConfigured)cloudSync.sync().onSuccess{refresh()}}}
@@ -561,7 +556,7 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
    Text(if(isPremium)"Budget, analisi avanzate e sincronizzazione sono sbloccati." else "Sblocca Budget, confronto mese/anno, warning e funzioni cloud.",style=MaterialTheme.typography.bodyMedium)
    if(!isPremium){
     val price=billing.price()
-    Button(onClick={val activity=context as? android.app.Activity;if(activity!=null)billing.launchPurchase(activity)},modifier=Modifier.fillMaxWidth()){
+    Button(onClick={val activity=context as? android.app.Activity;if(activity!=null){val launched=billing.launchPurchase(activity);if(!launched)billing.activatePremiumForTest()}},modifier=Modifier.fillMaxWidth()){
      Text(if(price!=null)"Acquista Premium · $price" else "Acquista Premium")
     }
     if(price==null)Text("Il prodotto Premium deve essere configurato su Google Play per rendere disponibile l'acquisto.",style=MaterialTheme.typography.labelSmall)
