@@ -27,8 +27,8 @@ android {
         if (localPropertiesFile.exists()) {
             localPropertiesFile.inputStream().use { localProperties.load(it) }
         }
-        buildConfigField("String", "SUPABASE_URL", "\"" + localProperties.getProperty("SUPABASE_URL", "") + "\"")
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "") + "\"")
+        buildConfigField("String", "SUPABASE_URL", "\"" + localProperties.getProperty("SUPABASE_URL", "https://ncwvcrgxifjdagnkyjeb.supabase.co") + "\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_0kZN7saf26kRyqczbKbylA_hy0ehPT2") + "\"")
     }
 
 
