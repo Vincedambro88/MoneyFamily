@@ -4,16 +4,10 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-
-@Serializable
-private data class CreateFamilyParams(
-    @SerialName("family_name") val familyName: String
-)
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class SupabaseRepository(
     private val client: io.github.jan.supabase.SupabaseClient = SupabaseClientProvider.client
@@ -66,9 +60,12 @@ class SupabaseRepository(
         }
 
     suspend fun createFamily(name: String): String = withContext(Dispatchers.IO) {
+        val parameters = buildJsonObject {
+            put("family_name", name.trim())
+        }
         client.postgrest.rpc(
             "create_family",
-            CreateFamilyParams(name.trim())
-        ).decodeAs<String>()
+            parameters
+        ).decodeSingle<String>()
     }
 }
