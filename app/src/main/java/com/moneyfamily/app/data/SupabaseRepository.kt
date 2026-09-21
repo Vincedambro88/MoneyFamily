@@ -70,22 +70,46 @@ class SupabaseRepository(
         ).decodeSingle<String>()
     }
 
-suspend fun isPremiumForCurrentFamily(): Boolean = withContext(Dispatchers.IO) {
-        val family = familiesForCurrentUser().firstOrNull() ?: return@withContext false
+    /**
+     * Account-centric Cloud workspace.
+     *
+     * The database keeps the existing family_id relationships internally for
+     * backwards compatibility, but the user does not create or manage a family.
+     * One authenticated MoneyFamily account owns one hidden workspace shared by
+     * all devices logged into that account.
+     */
+    suspend fun ensureAccountWorkspace(): String = withContext(Dispatchers.IO) {
+        val userId = client.auth.currentUserOrNull()?.id
+            ?: error("Devi effettuare l'accesso all'account MoneyFamily.")
+        familiesForCurrentUser().firstOrNull()?.id
+            ?: createFamily("MoneyFamily Account")
+    }
+
+    suspend fun isPremiumForCurrentAccount(): Boolean = withContext(Dispatchers.IO) {
+        val familyId = ensureAccountWorkspace()
         client.postgrest.rpc(
             "family_has_active_premium",
-            buildJsonObject { put("p_family_id", family.id) }
+            buildJsonObject { put("p_family_id", familyId) }
         ).decodeSingle<Boolean>()
     }
 
+suspend fun isPremiumForCurrentFamily(): Boolean = runCatching {
+        isPremiumForCurrentAccount()
+    }.getOrDefault(false)
+
     suspend fun verifyPremiumPurchase(purchaseToken: String): Boolean = withContext(Dispatchers.IO) {
-        client.functions.invoke(
-            function = "verify-premium-purchase",
-            body = buildJsonObject {
-                put("purchaseToken", purchaseToken)
-                put("productId", "moneyfamily_premium")
-            }
-        )
-        true
+        // Purchase verification is intentionally account-gated.
+        if (client.auth.currentUserOrNull()?.id == null) return@withContext false
+        ensureAccountWorkspace()
+        runCatching {
+            client.functions.invoke(
+                function = "verify-premium-purchase",
+                body = buildJsonObject {
+                    put("purchaseToken", purchaseToken)
+                    put("productId", "moneyfamily_premium")
+                }
+            )
+            true
+        }.getOrDefault(false)
     }
 }
