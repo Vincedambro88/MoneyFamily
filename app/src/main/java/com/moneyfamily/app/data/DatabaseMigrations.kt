@@ -34,3 +34,10 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         db.execSQL("CREATE TABLE IF NOT EXISTS operation_tombstones (cloudId TEXT NOT NULL PRIMARY KEY, deletedAt TEXT NOT NULL)")
     }
 }
+
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE movements ADD COLUMN updatedAt TEXT NOT NULL DEFAULT '2000-01-01T00:00:00Z'")
+    }
+}
