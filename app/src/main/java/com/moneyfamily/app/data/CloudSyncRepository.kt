@@ -112,7 +112,7 @@ class CloudSyncRepository(
         }.decodeList<CloudOperationDto>()
 
         val existingCloudIds = room.all().mapNotNull { it.cloudId }.toSet()
-        remoteOperations.filter { it.deletedAt == null && it.id !in existingCloudIds }.forEach { remote ->
+        remoteOperations.filter { it.deletedAt == null && it.id !in existingCloudIds }.forEach { remote: CloudOperationDto ->
             val typeName = remoteTypes.firstOrNull { it.id == remote.typologyId }?.name.orEmpty()
             val category = remoteCategories.firstOrNull { it.id == remote.categoryId }?.name.orEmpty()
             val member = remoteMembers.firstOrNull { it.id == remote.memberId }?.displayName.orEmpty()
