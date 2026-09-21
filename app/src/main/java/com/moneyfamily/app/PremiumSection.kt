@@ -201,7 +201,7 @@ fun PremiumSection(
                             }
                             OutlinedTextField(inputEmail, { inputEmail = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            Button(!busy && inputEmail.isNotBlank() && password.length >= 6, ::authenticate, Modifier.fillMaxWidth()) {
+                            Button(onClick = ::authenticate, enabled = !busy && inputEmail.isNotBlank() && password.length >= 6, modifier = Modifier.fillMaxWidth()) {
                                 Text(if (busy) "Attendere…" else if (mode == "login") "Accedi" else "Crea account")
                             }
                         } else {
@@ -211,7 +211,7 @@ fun PremiumSection(
                                 Button({ showCreateFamily = true }, Modifier.fillMaxWidth()) { Text("+ Crea famiglia") }
                                 if (showCreateFamily) {
                                     OutlinedTextField(familyInput, { familyInput = it }, label = { Text("Nome famiglia") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                                    Button(!busy && familyInput.isNotBlank(), ::createFamily, Modifier.fillMaxWidth()) { Text("Crea") }
+                                    Button(onClick = ::createFamily, enabled = !busy && familyInput.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Crea") }
                                 }
                             } else {
                                 Text("Famiglia: " + familyName.orEmpty())
