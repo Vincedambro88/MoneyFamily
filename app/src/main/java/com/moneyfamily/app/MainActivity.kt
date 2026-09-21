@@ -34,6 +34,7 @@ import kotlin.math.abs
 import androidx.compose.ui.platform.LocalContext
 import com.moneyfamily.app.data.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -59,7 +60,23 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
  var edit by remember{mutableStateOf<UiMovement?>(null)}
  var add by remember{mutableStateOf(false)}
  var isPremium by remember{mutableStateOf(false)}
- val premiumBilling=remember{PremiumBilling(c){isPremium=true}}
+ val premiumBilling=remember {
+    PremiumBilling(
+        c,
+        verifyPurchase = { token ->
+            if (!SupabaseClientProvider.isConfigured) true
+            else supabaseRepo.verifyPremiumPurchase(token)
+        },
+        onPremiumChanged = {
+            isPremium = true
+            scope.launch {
+                if (SupabaseClientProvider.isConfigured) {
+                    isPremium = supabaseRepo.isPremiumForCurrentFamily()
+                }
+            }
+        }
+    )
+}
  fun refresh(){scope.launch{data=repo.all().map{it.ui()};types=repo.allTypes();cats=repo.allCategories();members=repo.allMembers();links=repo.allMappings()}}
  LaunchedEffect(Unit){premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{isPremium=supabaseRepo.isPremiumForCurrentFamily()}}else{isPremium=premiumBilling.isPremium()}}
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
