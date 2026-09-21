@@ -47,6 +47,7 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
 @Composable private fun MoneyFamilyApp(){
  val c=LocalContext.current
  val repo=remember{RoomRepository(c)}
+ val supabaseRepo=remember{SupabaseRepository()}
  val scope=rememberCoroutineScope()
  var data by remember{mutableStateOf<List<UiMovement>>(emptyList())}
  var types by remember{mutableStateOf<List<TypeEntity>>(emptyList())}
@@ -80,7 +81,7 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
   3->androidx.compose.ui.graphics.Color(0xFFEA580C)
   else->androidx.compose.ui.graphics.Color(0xFF0891B2)
  }
-)},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh()}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()},premiumBilling,isPremium);4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
+)},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh()}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()},premiumBilling,isPremium,supabaseRepo);4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
 }
 
 @Composable private fun Dashboard(data:List<UiMovement>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit,isPremium:Boolean){
@@ -350,11 +351,12 @@ private val ChartColors=listOf(
  if(showEditor)Editor(null,types,cats,members,links,repo,{showEditor=false}){save(it);showEditor=false}
 }
 
-@Composable private fun Configuration(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit,billing:PremiumBilling,isPremium:Boolean){
+@Composable private fun Configuration(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit,billing:PremiumBilling,isPremium:Boolean,supabaseRepo:SupabaseRepository){
  var section by remember{mutableStateOf(0)}
  Column(Modifier.fillMaxSize().padding(16.dp)){
   Text("Configurazione",style=MaterialTheme.typography.headlineSmall)
   PremiumCard(billing,isPremium)
+  CloudAccountCard(supabaseRepo,isPremium)
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(2.dp)){
    listOf("Tipologie","Categorie","Famiglia","Associazioni").forEachIndexed{i,t->TextButton(onClick={section=i}){Text(t)}}
   }
@@ -477,6 +479,46 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
 }
 
 
+@Composable private fun CloudAccountCard(repo:SupabaseRepository,isPremium:Boolean){
+ val scope=rememberCoroutineScope()
+ var email by remember{mutableStateOf<String?>(null)}
+ var familyName by remember{mutableStateOf<String?>(null)}
+ var familyId by remember{mutableStateOf<String?>(null)}
+ var members by remember{mutableStateOf<List<SupabaseFamilyMemberDto>>(emptyList())}
+ var busy by remember{mutableStateOf(false)}
+ var error by remember{mutableStateOf<String?>(null)}
+ var mode by remember{mutableStateOf("login")}
+ var inputEmail by remember{mutableStateOf("")}
+ var password by remember{mutableStateOf("")}
+ var familyInput by remember{mutableStateOf("")}
+ var showCreateFamily by remember{mutableStateOf(false)}
+ var refresh by remember{mutableStateOf(0)}
+ fun load(){
+  scope.launch{busy=true;error=null;runCatching{email=repo.currentUserEmail();val families=repo.familiesForCurrentUser();val family=families.firstOrNull();familyId=family?.id;familyName=family?.name;members=family?.let{repo.familyMembers(it.id)}?:emptyList()}.onFailure{error=it.message?:"Errore di connessione"};busy=false}
+ }
+ LaunchedEffect(refresh){if(SupabaseClientProvider.isConfigured)load()}
+ Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+  Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("Account e famiglia",style=MaterialTheme.typography.titleLarge)
+   if(!SupabaseClientProvider.isConfigured){Text("Cloud non configurato su questo dispositivo. Funzionamento locale invariato.")}
+   else if(email==null){
+    Text("Accedi allo stesso account su più dispositivi per condividere la stessa famiglia.")
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){FilterChip(selected=mode=="login",onClick={mode="login"},label={Text("Accedi")},modifier=Modifier.weight(1f));FilterChip(selected=mode=="signup",onClick={mode="signup"},label={Text("Registrati")},modifier=Modifier.weight(1f))}
+    OutlinedTextField(value=inputEmail,onValueChange={inputEmail=it},label={Text("Email")},singleLine=true,modifier=Modifier.fillMaxWidth())
+    OutlinedTextField(value=password,onValueChange={password=it},label={Text("Password")},singleLine=true,modifier=Modifier.fillMaxWidth())
+    Button(enabled=!busy&&inputEmail.isNotBlank()&&password.length>=6,onClick={scope.launch{busy=true;error=null;runCatching{if(mode=="login")repo.signIn(inputEmail,password)else repo.signUp(inputEmail,password);inputEmail="";password=""}.onFailure{error=it.message?:"Operazione non riuscita"};busy=false;refresh++}},modifier=Modifier.fillMaxWidth()){Text(if(busy)"Attendere…"else if(mode=="login")"Accedi"else"Crea account")}
+   }else{
+    Text("Account: "+email,style=MaterialTheme.typography.bodyLarge)
+    if(familyId==null){
+     Text("Nessuna famiglia associata a questo account.")
+     if(showCreateFamily){OutlinedTextField(value=familyInput,onValueChange={familyInput=it},label={Text("Nome famiglia")},singleLine=true,modifier=Modifier.fillMaxWidth());Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton(onClick={showCreateFamily=false},modifier=Modifier.weight(1f)){Text("Annulla")};Button(enabled=!busy&&familyInput.isNotBlank(),onClick={scope.launch{busy=true;error=null;runCatching{repo.createFamily(familyInput)}.onSuccess{familyInput="";showCreateFamily=false}.onFailure{error=it.message?:"Creazione famiglia non riuscita"};busy=false;refresh++}},modifier=Modifier.weight(1f)){Text("Crea")}}}else Button(onClick={showCreateFamily=true},modifier=Modifier.fillMaxWidth()){Text("+ Crea famiglia")}
+    }else{Text("Famiglia: "+(familyName?:""),style=MaterialTheme.typography.bodyLarge);Text("Membri: "+members.size);members.forEach{Text("• "+it.displayName+" ("+it.role+")",style=MaterialTheme.typography.bodyMedium)};if(isPremium)Text("Premium: condiviso a livello famiglia",color=PositiveColor,style=MaterialTheme.typography.labelLarge);Text("Usa lo stesso account sugli altri dispositivi per accedere agli stessi dati della famiglia.",style=MaterialTheme.typography.bodySmall)}
+    OutlinedButton(onClick={scope.launch{runCatching{repo.signOutCurrentDevice()}.onFailure{error=it.message};refresh++}},modifier=Modifier.fillMaxWidth()){Text("Esci da questo dispositivo")}
+   }
+   error?.let{Text(it,color=NegativeColor,style=MaterialTheme.typography.bodySmall)}
+  }
+ }
+}
 @Composable private fun PremiumCard(billing:PremiumBilling,isPremium:Boolean){
  val context=LocalContext.current
  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
