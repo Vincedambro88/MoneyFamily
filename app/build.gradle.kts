@@ -2,14 +2,32 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
     id("com.google.devtools.ksp") version "2.0.21-1.0.28"
 }
 
 android {
     namespace = "com.moneyfamily.app"
+    buildFeatures {
+        buildConfig = true
+    }
     compileSdk = 36
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-    defaultConfig { applicationId = "com.vdapps.moneyfamily"; minSdk = 26; targetSdk = 36; versionCode = 7; versionName = "1.1.0";  }
+    defaultConfig {
+        applicationId = "com.vdapps.moneyfamily"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 7
+        versionName = "1.1.0"
+
+        val localProperties = java.util.Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localPropertiesFile.inputStream().use { localProperties.load(it) }
+        }
+        buildConfigField("String", "SUPABASE_URL", "\"" + localProperties.getProperty("SUPABASE_URL", "") + "\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "") + "\"")
+    }
 
 
     signingConfigs {
@@ -46,4 +64,9 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("com.android.billingclient:billing-ktx:7.1.1")
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.1.4"))
+    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    implementation("io.ktor:ktor-client-android:3.1.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 }
