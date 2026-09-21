@@ -140,11 +140,46 @@ class CloudSyncRepository(
             filter { eq("family_id", familyId) }
         }.decodeList<CloudMemberDto>()
 
+        val remoteOperationsBeforePush = supabase.client.from("operations").select {
+            filter { eq("family_id", familyId) }
+        }.decodeList<CloudOperationDto>()
+        val remoteById = remoteOperationsBeforePush.associateBy { it.id }
+
         local.forEach { movement ->
             val cloudId = movement.cloudId ?: UUID.nameUUIDFromBytes((familyId + ":operation:" + movement.id).toByteArray()).toString()
+            val remote = remoteById[cloudId]
+            if (remote != null && remote.deletedAt != null) {
+                if (remote.updatedAt >= movement.updatedAt) {
+                    room.deleteByCloudId(cloudId)
+                    return@forEach
+                }
+            }
+            if (remote != null && remote.updatedAt > movement.updatedAt) {
+                val typeName = remoteTypes.firstOrNull { it.id == remote.typologyId }?.name.orEmpty()
+                val category = remoteCategories.firstOrNull { it.id == remote.categoryId }?.name.orEmpty()
+                val member = remoteMembers.firstOrNull { it.id == remote.memberId }?.displayName.orEmpty()
+                room.updateCloud(
+                    Movement(
+                        id = movement.id,
+                        type = if (remote.amount >= 0) MovementType.INCOME else MovementType.EXPENSE,
+                        amount = remote.amount,
+                        category = category,
+                        description = remote.description,
+                        date = remote.operationDate.fromSupabaseDate(),
+                        member = member,
+                        paymentMethod = remote.paymentMethod,
+                        typeName = typeName
+                    ),
+                    cloudId,
+                    remote.updatedAt
+                )
+                return@forEach
+            }
+
             val typologyId = remoteTypes.firstOrNull { it.name.equals(movement.typeName, true) }?.id
             val categoryId = remoteCategories.firstOrNull { it.name.equals(movement.category, true) }?.id
             val memberId = remoteMembers.firstOrNull { it.displayName.equals(movement.member, true) }?.id
+            val timestamp = if (movement.updatedAt > "2000-01-01T00:00:00Z") movement.updatedAt else java.time.Instant.now().toString()
 
             supabase.client.from("operations").upsert(
                 CloudOperationDto(
@@ -158,13 +193,12 @@ class CloudSyncRepository(
                     operationDate = movement.date.toSupabaseDate(),
                     paymentMethod = movement.paymentMethod,
                     createdBy = supabase.currentUserId(),
-                    updatedAt = "2000-01-01T00:00:00Z",
+                    updatedAt = timestamp,
                     deletedAt = null
                 )
             )
             room.setCloudId(movement.id, cloudId)
         }
-
         val remoteOperations = supabase.client.from("operations").select {
             filter { eq("family_id", familyId) }
         }.decodeList<CloudOperationDto>()
