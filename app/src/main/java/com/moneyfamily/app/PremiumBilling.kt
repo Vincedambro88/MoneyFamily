@@ -2,6 +2,10 @@ package com.moneyfamily.app
 
 import android.app.Activity
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
@@ -14,6 +18,7 @@ import com.android.billingclient.api.QueryPurchasesParams
 
 class PremiumBilling(
     context: Context,
+    private val verifyPurchase: suspend (String) -> Boolean,
     private val onPremiumChanged: (Boolean) -> Unit
 ) {
     companion object { const val PRODUCT_ID = "moneyfamily_premium" }
@@ -27,6 +32,7 @@ class PremiumBilling(
         .build()
 
     private var productDetails: ProductDetails? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun connect() {
         billingClient.startConnection(object : BillingClientStateListener {
@@ -62,6 +68,7 @@ class PremiumBilling(
 
     fun close() {
         billingClient.endConnection()
+        scope.cancel()
     }
 
     private fun queryProduct() {
@@ -96,16 +103,23 @@ class PremiumBilling(
                             .setPurchaseToken(purchase.purchaseToken)
                             .build()
                     ) { ack ->
-                        if (ack.responseCode == BillingClient.BillingResponseCode.OK) setPremium()
+                        if (ack.responseCode == BillingClient.BillingResponseCode.OK) verifyAndSetPremium(purchase.purchaseToken)
                     }
                 } else {
-                    setPremium()
+                    verifyAndSetPremium(purchase.purchaseToken)
                 }
             }
     }
 
-    private fun setPremium() {
-        prefs.edit().putBoolean("premium", true).apply()
-        onPremiumChanged(true)
+    private fun verifyAndSetPremium(purchaseToken: String) {
+        scope.launch {
+            runCatching { verifyPurchase(purchaseToken) }
+                .onSuccess { verified ->
+                    if (verified) {
+                        prefs.edit().putBoolean("premium", true).apply()
+                        onPremiumChanged(true)
+                    }
+                }
+        }
     }
 }
