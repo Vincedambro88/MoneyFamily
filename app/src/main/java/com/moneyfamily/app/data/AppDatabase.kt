@@ -9,9 +9,10 @@ import androidx.room.RoomDatabase
         TypeEntity::class,
         CategoryEntity::class,
         FamilyMemberEntity::class,
-        TypeCategoryEntity::class
+        TypeCategoryEntity::class,
+        OperationTombstone::class
     ],
-    version = 3,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -20,4 +21,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun familyMemberDao(): FamilyMemberDao
     abstract fun typeCategoryDao(): TypeCategoryDao
+    abstract fun operationTombstoneDao(): OperationTombstoneDao
 }

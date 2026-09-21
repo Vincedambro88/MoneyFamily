@@ -20,3 +20,24 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         db.execSQL("ALTER TABLE movements ADD COLUMN typeName TEXT NOT NULL DEFAULT ''")
     }
 }
+
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE movements ADD COLUMN cloudId TEXT")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_movements_cloudId ON movements(cloudId)")
+    }
+}
+
+
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS operation_tombstones (cloudId TEXT NOT NULL PRIMARY KEY, deletedAt TEXT NOT NULL)")
+    }
+}
+
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE movements ADD COLUMN updatedAt TEXT NOT NULL DEFAULT '2000-01-01T00:00:00Z'")
+    }
+}

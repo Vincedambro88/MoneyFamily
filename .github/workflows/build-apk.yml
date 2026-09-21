@@ -1,9 +1,12 @@
 name: Build MoneyFamily AAB + APK
+# CI validation for Supabase multi-device release
 
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "premium-test" ]
+    branches: [ "main", "premium-test", "feature/supabase" ]
+  pull_request:
+    branches: [ "main" ]
 
 permissions:
   contents: read
@@ -34,6 +37,16 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+
+      - name: Prepare Supabase build configuration
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          {
+            echo "SUPABASE_URL=$SUPABASE_URL"
+            echo "SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
+          } > local.properties
 
       - name: Prepare upload keystore
         env:

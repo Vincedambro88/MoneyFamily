@@ -6,19 +6,45 @@ import androidx.room.withTransaction
 
 class RoomRepository(private val context: Context) {
     private val db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "moneyfamily.db")
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+         .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
         .build()
     private val dao = db.movementDao()
     private val types = db.typeDao()
     private val categories = db.categoryDao()
     private val members = db.familyMemberDao()
     private val mappings = db.typeCategoryDao()
+    private val tombstones = db.operationTombstoneDao()
 
     suspend fun all(): List<Movement> = dao.getAll().map { it.toModel() }
-    suspend fun insert(item: Movement) = dao.insert(item.toEntity())
-    suspend fun update(item: Movement) = dao.update(item.toEntity())
-    suspend fun delete(item: Movement) = dao.delete(item.toEntity())
-    suspend fun deleteAll(items: List<Movement>) { items.forEach { dao.delete(it.toEntity()) } }
+    suspend fun allEntities(): List<MovementEntity> = dao.getAll()
+    suspend fun insert(item: Movement) = dao.insert(item.toEntity().copy(updatedAt = java.time.Instant.now().toString()))
+    suspend fun update(item: Movement) {
+        val current = dao.getAll().firstOrNull { it.id == item.id }
+        dao.update(item.toEntity().copy(cloudId = current?.cloudId, updatedAt = java.time.Instant.now().toString()))
+    }
+    suspend fun delete(item: Movement) {
+        val current = dao.getAll().firstOrNull { it.id == item.id }
+        current?.cloudId?.let { tombstones.insert(OperationTombstone(it, java.time.Instant.now().toString())) }
+        dao.delete(item.toEntity())
+    }
+    suspend fun deleteAll(items: List<Movement>) { items.forEach { delete(it) } }
+    suspend fun allTombstones(): List<OperationTombstone> = tombstones.getAll()
+    suspend fun removeTombstone(cloudId: String) = tombstones.delete(cloudId)
+    suspend fun deleteByCloudId(cloudId: String) = dao.deleteByCloudId(cloudId)
+
+    suspend fun setCloudId(localId: Long, cloudId: String) {
+        val current = dao.getAll().firstOrNull { it.id == localId } ?: return
+        dao.update(current.copy(cloudId = cloudId))
+    }
+
+    suspend fun insertCloud(item: Movement, cloudId: String, updatedAt: String = java.time.Instant.now().toString()) {
+        dao.insert(item.toEntity().copy(cloudId = cloudId, updatedAt = updatedAt))
+    }
+
+    suspend fun updateCloud(item: Movement, cloudId: String, updatedAt: String) {
+        val current = dao.getAll().firstOrNull { it.cloudId == cloudId } ?: return
+        dao.update(item.toEntity().copy(id = current.id, cloudId = cloudId, updatedAt = updatedAt))
+    }
 
     suspend fun allTypes(): List<TypeEntity> { seedDefaults(); return types.active() }
     suspend fun activeTypes(): List<TypeEntity> { seedDefaults(); return types.active() }
