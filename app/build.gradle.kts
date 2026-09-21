@@ -27,8 +27,10 @@ android {
         if (localPropertiesFile.exists()) {
             localPropertiesFile.inputStream().use { localProperties.load(it) }
         }
-        buildConfigField("String", "SUPABASE_URL", "\"" + localProperties.getProperty("SUPABASE_URL", "") + "\"")
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "") + "\"")
+        val supabaseUrl = localProperties.getProperty("SUPABASE_URL", "").ifBlank { "https://ncwvcrgxifjdagnkyjeb.supabase.co" }
+        val supabasePublishableKey = localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "").ifBlank { "sb_publishable_0kZN7saf26kRyqczbKbylA_hy0ehPT2" }
+        buildConfigField("String", "SUPABASE_URL", "\"" + supabaseUrl + "\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + supabasePublishableKey + "\"")
     }
 
 
