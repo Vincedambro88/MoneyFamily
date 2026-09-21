@@ -171,7 +171,12 @@ class CloudSyncRepository(
 
         val existingCloudIds = room.allEntities().mapNotNull { entity -> entity.cloudId }.toSet()
         for (remote in remoteOperations) {
-            if (remote.deletedAt != null || remote.id in existingCloudIds) continue
+            if (remote.deletedAt != null) {
+                if (remote.id in existingCloudIds) room.deleteByCloudId(remote.id)
+                room.removeTombstone(remote.id)
+                continue
+            }
+            if (remote.id in existingCloudIds) continue
             val typeName = remoteTypes.firstOrNull { it.id == remote.typologyId }?.name.orEmpty()
             val category = remoteCategories.firstOrNull { it.id == remote.categoryId }?.name.orEmpty()
             val member = remoteMembers.firstOrNull { it.id == remote.memberId }?.displayName.orEmpty()
