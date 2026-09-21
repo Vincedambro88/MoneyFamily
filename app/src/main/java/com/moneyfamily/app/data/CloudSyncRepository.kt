@@ -71,7 +71,7 @@ class CloudSyncRepository(
     }
 
     private suspend fun syncOperations(familyId: String) {
-        val local = room.all()
+        val local = room.allEntities()
         val remoteTypes = supabase.client.from("typologies").select {
             filter { eq("family_id", familyId) }
         }.decodeList<CloudTypologyDto>()
@@ -83,7 +83,7 @@ class CloudSyncRepository(
         }.decodeList<CloudMemberDto>()
 
         local.forEach { movement ->
-            val cloudId = UUID.nameUUIDFromBytes((familyId + ":operation:" + movement.id).toByteArray()).toString()
+            val cloudId = movement.cloudId ?: UUID.nameUUIDFromBytes((familyId + ":operation:" + movement.id).toByteArray()).toString()
             val typologyId = remoteTypes.firstOrNull { it.name.equals(movement.typeName, true) }?.id
             val categoryId = remoteCategories.firstOrNull { it.name.equals(movement.category, true) }?.id
             val memberId = remoteMembers.firstOrNull { it.displayName.equals(movement.member, true) }?.id
