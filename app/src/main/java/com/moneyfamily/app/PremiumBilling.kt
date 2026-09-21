@@ -20,7 +20,8 @@ import com.android.billingclient.api.QueryPurchasesParams
 class PremiumBilling(
     context: Context,
     private val verifyPurchase: suspend (String) -> Boolean,
-    private val onPremiumChanged: (Boolean) -> Unit
+    private val onPremiumChanged: (Boolean) -> Unit,
+    private val onPurchaseDetected: () -> Unit = {}
 ) {
     companion object { const val PRODUCT_ID = "moneyfamily_premium" }
 
@@ -48,6 +49,12 @@ class PremiumBilling(
     }
 
     fun isPremium(): Boolean = prefs.getBoolean("premium", false)
+
+    fun isPremiumSetupRequired(): Boolean = prefs.getBoolean("premium_setup_required", false)
+
+    fun recheckOwnedPurchases() {
+        queryOwned()
+    }
 
     fun launchPurchase(activity: Activity): Boolean {
         val product = productDetails ?: return false
@@ -98,6 +105,9 @@ class PremiumBilling(
         if (result.responseCode != BillingClient.BillingResponseCode.OK) return
         purchases.orEmpty().filter { it.products.contains(PRODUCT_ID) && it.purchaseState == Purchase.PurchaseState.PURCHASED }
             .forEach { purchase ->
+                prefs.edit().putBoolean("premium_setup_required", true).apply()
+                onPurchaseDetected()
+
                 if (!purchase.isAcknowledged) {
                     billingClient.acknowledgePurchase(
                         com.android.billingclient.api.AcknowledgePurchaseParams.newBuilder()
@@ -117,7 +127,7 @@ class PremiumBilling(
             runCatching { verifyPurchase(purchaseToken) }
                 .onSuccess { verified ->
                     if (verified) {
-                        prefs.edit().putBoolean("premium", true).apply()
+                        prefs.edit().putBoolean("premium", true).putBoolean("premium_setup_required", false).apply()
                         onPremiumChanged(true)
                     }
                 }
