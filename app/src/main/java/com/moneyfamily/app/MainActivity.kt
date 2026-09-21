@@ -2,6 +2,7 @@ package com.moneyfamily.app
 
 import android.app.DatePickerDialog
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -43,7 +44,7 @@ private val money = NumberFormat.getCurrencyInstance(Locale.ITALY)
 private val df = SimpleDateFormat("dd/MM/yyyy", Locale.ITALY)
 private val mf = SimpleDateFormat("MMMM yyyy", Locale.ITALIAN)
 data class UiMovement(val id:Long,val type:MovementType,val amount:Double,val category:String,val description:String,val date:String,val member:String,val typeName:String = "")
-class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.onCreate(s);setContent{MoneyFamilyApp()}}}
+class MainActivity:ComponentActivity(){\n override fun onCreate(s:Bundle?){super.onCreate(s);SupabaseClientProvider.client.handleDeeplinks(intent);setContent{MoneyFamilyApp()}}\n override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);SupabaseClientProvider.client.handleDeeplinks(intent)}\n}
 
 @Composable private fun MoneyFamilyApp(){
  val c=LocalContext.current
