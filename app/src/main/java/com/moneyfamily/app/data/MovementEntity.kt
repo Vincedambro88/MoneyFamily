@@ -14,5 +14,6 @@ data class MovementEntity(
     val date: String,
     val member: String,
     val paymentMethod: String,
-    val cloudId: String? = null
+    val cloudId: String? = null,
+    val updatedAt: String = "2000-01-01T00:00:00Z"
 )
