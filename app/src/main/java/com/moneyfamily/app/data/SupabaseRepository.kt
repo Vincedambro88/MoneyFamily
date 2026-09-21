@@ -86,6 +86,7 @@ class SupabaseRepository(
     }
 
     suspend fun isPremiumForCurrentAccount(): Boolean = withContext(Dispatchers.IO) {
+        if (client.auth.currentUserOrNull()?.id == null) return@withContext false
         val familyId = ensureAccountWorkspace()
         client.postgrest.rpc(
             "family_has_active_premium",
