@@ -1,6 +1,7 @@
 name: Build MoneyFamily AAB + APK
 # CI validation for Supabase multi-device release
 # Main release build validation
+# Test branch includes a safe public Supabase publishable key fallback.
 
 on:
   workflow_dispatch:
