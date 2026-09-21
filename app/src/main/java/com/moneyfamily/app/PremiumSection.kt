@@ -67,10 +67,14 @@ fun PremiumSection(
             runCatching {
                 if (mode == "login") {
                     supabaseRepo.signIn(inputEmail, password)
+                    supabaseRepo.ensureAccountWorkspace()
                 } else {
+                    // With email confirmation enabled Supabase creates the user
+                    // but does not establish a session until the confirmation
+                    // link is opened. Workspace creation therefore happens
+                    // after the callback/deep-link, not here.
                     supabaseRepo.signUp(inputEmail, password)
                 }
-                supabaseRepo.ensureAccountWorkspace()
             }.onSuccess {
                 inputEmail = ""
                 password = ""
