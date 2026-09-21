@@ -6,7 +6,7 @@ import androidx.room.withTransaction
 
 class RoomRepository(private val context: Context) {
     private val db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "moneyfamily.db")
-         .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+         .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
         .build()
     private val dao = db.movementDao()
     private val types = db.typeDao()
@@ -17,10 +17,10 @@ class RoomRepository(private val context: Context) {
 
     suspend fun all(): List<Movement> = dao.getAll().map { it.toModel() }
     suspend fun allEntities(): List<MovementEntity> = dao.getAll()
-    suspend fun insert(item: Movement) = dao.insert(item.toEntity())
+    suspend fun insert(item: Movement) = dao.insert(item.toEntity().copy(updatedAt = java.time.Instant.now().toString()))
     suspend fun update(item: Movement) {
         val current = dao.getAll().firstOrNull { it.id == item.id }
-        dao.update(item.toEntity().copy(cloudId = current?.cloudId))
+        dao.update(item.toEntity().copy(cloudId = current?.cloudId, updatedAt = java.time.Instant.now().toString()))
     }
     suspend fun delete(item: Movement) {
         val current = dao.getAll().firstOrNull { it.id == item.id }
