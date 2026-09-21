@@ -49,6 +49,12 @@ class PremiumBilling(
 
     fun isPremium(): Boolean = prefs.getBoolean("premium", false)
 
+    /** Test-only activation used by the dedicated premium simulation build. */
+    fun activatePremiumForTest() {
+        prefs.edit().putBoolean("premium", true).apply()
+        onPremiumChanged(true)
+    }
+
     fun launchPurchase(activity: Activity): Boolean {
         val product = productDetails ?: return false
         product.oneTimePurchaseOfferDetails ?: return false
