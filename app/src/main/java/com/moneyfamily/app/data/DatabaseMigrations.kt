@@ -20,3 +20,10 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         db.execSQL("ALTER TABLE movements ADD COLUMN typeName TEXT NOT NULL DEFAULT ''")
     }
 }
+
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE movements ADD COLUMN cloudId TEXT")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_movements_cloudId ON movements(cloudId)")
+    }
+}
