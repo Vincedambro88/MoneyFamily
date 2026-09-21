@@ -257,67 +257,80 @@ private val ChartColors=listOf(
    runCatching{
     ExcelExporter.write(context,uri,base)
     exportStatus="Operazioni esportate in Excel"
-   }.onFailure{
-    exportStatus="Errore esportazione: "+(it.message?:"operazione non riuscita")
-   }
+   }.onFailure{exportStatus="Errore esportazione: "+(it.message?:"operazione non riuscita")}
   }
  }
 
- Column(Modifier.fillMaxSize().padding(16.dp)){
-  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-   FilterChip(selected=!annual,onClick={annual=false},label={Text("Mese")},modifier=Modifier.weight(1f))
-   FilterChip(selected=annual,onClick={annual=true},label={Text("Anno")},modifier=Modifier.weight(1f))
-  }
-  if(annual){
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
-    OutlinedButton(onClick={operationMonth=shift(operationMonth,-12)}){Text("‹")}
-    Text("Riepilogo $year",style=MaterialTheme.typography.titleLarge)
-    OutlinedButton(onClick={operationMonth=shift(operationMonth,12)}){Text("›")}
-   }
-  }else{
-   MonthBar(mf.format(operationMonth.time),{operationMonth=shift(operationMonth,-1)},{operationMonth=shift(operationMonth,1)})
-  }
-
-  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+ LazyColumn(
+  Modifier.fillMaxSize().padding(16.dp),
+  verticalArrangement=Arrangement.spacedBy(8.dp),
+  contentPadding=PaddingValues(bottom=24.dp)
+ ){
+  item{
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-    MetricCard("Entrate",income,Modifier.weight(1f))
-    MetricCard("Uscite",expense,Modifier.weight(1f))
-    MetricCard("Saldo",balance,Modifier.weight(1f))
+    FilterChip(selected=!annual,onClick={annual=false},label={Text("Mese")},modifier=Modifier.weight(1f))
+    FilterChip(selected=annual,onClick={annual=true},label={Text("Anno")},modifier=Modifier.weight(1f))
    }
   }
-
-  OutlinedButton(onClick={confirmDelete=true},modifier=Modifier.fillMaxWidth()){
-   Text(if(annual)"Cancella tutte le operazioni dell'anno $year" else "Cancella tutte le operazioni del periodo")
+  item{
+   if(annual){
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={operationMonth=shift(operationMonth,-12)}){Text("‹")}
+     Text("Riepilogo $year",style=MaterialTheme.typography.titleLarge)
+     OutlinedButton(onClick={operationMonth=shift(operationMonth,12)}){Text("›")}
+    }
+   }else{
+    MonthBar(mf.format(operationMonth.time),{operationMonth=shift(operationMonth,-1)},{operationMonth=shift(operationMonth,1)})
+   }
   }
-  OutlinedButton(onClick={exportLauncher.launch("MoneyFamily_Operazioni_${if(annual)year else mf.format(operationMonth.time)}.xlsx")},modifier=Modifier.fillMaxWidth()){
-   Text("Scarica in Excel")
+  item{
+   Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+     MetricCard("Entrate",income,Modifier.weight(1f))
+     MetricCard("Uscite",expense,Modifier.weight(1f))
+     MetricCard("Saldo",balance,Modifier.weight(1f))
+    }
+   }
   }
-  if(exportStatus.isNotBlank())Text(exportStatus,color=if(exportStatus.startsWith("Errore"))NegativeColor else PositiveColor)
-
-  OutlinedTextField(value=q,onValueChange={q=it},label={Text(if(annual)"Cerca tra tutte le operazioni dell'anno" else "Cerca descrizione")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-
-  Choice("Tipologia",type.ifBlank{"Tutte"},context,listOf("Tutte")+types.map{it.name}){type=if(it=="Tutte")"" else it}
-  Choice("Categoria",cat.ifBlank{"Tutte"},context,listOf("Tutte")+cats.map{it.name}){cat=if(it=="Tutte")"" else it}
-  Choice("Componente",member.ifBlank{"Tutti"},context,listOf("Tutti")+members.map{it.name}){member=if(it=="Tutti")"" else it}
-  Choice("Tipo",kind.ifBlank{"Tutti"},context,listOf("Tutti","Spese","Ricavi")){kind=if(it=="Tutti")"" else it}
-
-  Text(
-   if(annual)"${filtered.size} operazioni trovate nell'anno $year"
-   else "${filtered.size} operazioni trovate nel mese",
-   style=MaterialTheme.typography.labelLarge
-  )
-
-  LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)){
-   items(filtered){x->
-    Card(Modifier.fillMaxWidth()){Column(Modifier.padding(12.dp)){
+  item{
+   OutlinedButton(onClick={confirmDelete=true},modifier=Modifier.fillMaxWidth()){
+    Text(if(annual)"Cancella tutte le operazioni dell'anno $year" else "Cancella tutte le operazioni del periodo")
+   }
+  }
+  item{
+   OutlinedButton(onClick={exportLauncher.launch("MoneyFamily_Operazioni_${if(annual)year else mf.format(operationMonth.time)}.xlsx")},modifier=Modifier.fillMaxWidth()){
+    Text("Scarica in Excel")
+   }
+  }
+  if(exportStatus.isNotBlank()) item{Text(exportStatus,color=if(exportStatus.startsWith("Errore"))NegativeColor else PositiveColor)}
+  item{
+   OutlinedTextField(
+    value=q,onValueChange={q=it},
+    label={Text(if(annual)"Cerca tra tutte le operazioni dell'anno" else "Cerca descrizione")},
+    modifier=Modifier.fillMaxWidth(),singleLine=true
+   )
+  }
+  item{Choice("Tipologia",type.ifBlank{"Tutte"},context,listOf("Tutte")+types.map{it.name}){type=if(it=="Tutte")"" else it}}
+  item{Choice("Categoria",cat.ifBlank{"Tutte"},context,listOf("Tutte")+cats.map{it.name}){cat=if(it=="Tutte")"" else it}}
+  item{Choice("Componente",member.ifBlank{"Tutti"},context,listOf("Tutti")+members.map{it.name}){member=if(it=="Tutti")"" else it}}
+  item{Choice("Tipo",kind.ifBlank{"Tutti"},context,listOf("Tutti","Spese","Ricavi")){kind=if(it=="Tutti")"" else it}}
+  item{
+   Text(
+    if(annual)"${filtered.size} operazioni trovate nell'anno $year" else "${filtered.size} operazioni trovate nel mese",
+    style=MaterialTheme.typography.labelLarge
+   )
+  }
+  items(filtered,key={it.id}){x->
+   Card(Modifier.fillMaxWidth()){
+    Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(3.dp)){
      Text(x.description.ifBlank{x.type.name},style=MaterialTheme.typography.titleMedium)
      Text("${x.typeName.ifBlank{"Non classificata"}} • ${x.category} • ${x.member} • ${x.date}")
-     Text(money.format(x.amount))
+     Text(money.format(x.amount),color=if(x.amount<0)NegativeColor else PositiveColor)
      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
       TextButton(onClick={edit(x)}){Text("Modifica")}
       TextButton(onClick={remove(x)}){Text("Elimina")}
      }
-    }}
+    }
    }
   }
  }
