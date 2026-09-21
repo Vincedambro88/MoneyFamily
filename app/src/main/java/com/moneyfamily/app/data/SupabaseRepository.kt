@@ -32,9 +32,4 @@ class SupabaseRepository(
                 .decodeList<SupabaseFamilyMemberDto>()
         }
 
-    suspend fun createFamily(name: String): String = withContext(Dispatchers.IO) {
-        client.from("create_family")
-            .select()
-            .decodeSingle<String>()
-    }
 }
