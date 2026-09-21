@@ -1,6 +1,6 @@
 package com.moneyfamily.app.data
 
-import io.github.jan.supabase.gotrue.auth
+import io.github.jan.supabase.auth
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
