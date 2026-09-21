@@ -69,6 +69,6 @@ class SupabaseRepository(
         client.postgrest.rpc(
             "create_family",
             CreateFamilyParams(name.trim())
-        ).decodeSingle<String>()
+        ).decodeAs<String>()
     }
 }
