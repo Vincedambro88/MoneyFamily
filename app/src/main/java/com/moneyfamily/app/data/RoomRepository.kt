@@ -32,9 +32,9 @@ class RoomRepository(private val context: Context) {
     suspend fun removeTombstone(cloudId: String) = tombstones.delete(cloudId)
     suspend fun deleteByCloudId(cloudId: String) = dao.deleteByCloudId(cloudId)
 
-    suspend fun setCloudId(localId: Long, cloudId: String) {
+    suspend fun setCloudId(localId: Long, cloudId: String, updatedAt: String? = null) {
         val current = dao.getAll().firstOrNull { it.id == localId } ?: return
-        dao.update(current.copy(cloudId = cloudId))
+        dao.update(current.copy(cloudId = cloudId, updatedAt = updatedAt ?: current.updatedAt))
     }
 
     suspend fun insertCloud(item: Movement, cloudId: String, updatedAt: String = java.time.Instant.now().toString()) {
