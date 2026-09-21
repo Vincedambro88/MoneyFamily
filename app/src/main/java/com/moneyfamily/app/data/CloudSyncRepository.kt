@@ -1,5 +1,7 @@
 package com.moneyfamily.app.data
 
+import io.github.jan.supabase.postgrest.from
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
