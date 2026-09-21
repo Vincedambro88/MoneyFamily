@@ -111,6 +111,25 @@ class CloudSyncRepository(
 
     private suspend fun syncOperations(familyId: String) {
         val local = room.allEntities()
+
+        // Publish offline deletions before uploading local operations, preventing deleted rows from being recreated.
+        for (tombstone in room.allTombstones()) {
+            supabase.client.from("operations").upsert(
+                CloudOperationDto(
+                    id = tombstone.cloudId,
+                    familyId = familyId,
+                    amount = 0.0,
+                    description = "",
+                    operationDate = "1970-01-01",
+                    paymentMethod = "",
+                    createdBy = supabase.currentUserId(),
+                    updatedAt = tombstone.deletedAt,
+                    deletedAt = tombstone.deletedAt
+                )
+            )
+            room.removeTombstone(tombstone.cloudId)
+        }
+
         val remoteTypes = supabase.client.from("typologies").select {
             filter { eq("family_id", familyId) }
         }.decodeList<CloudTypologyDto>()
