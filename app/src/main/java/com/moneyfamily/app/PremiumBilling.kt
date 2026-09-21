@@ -53,6 +53,8 @@ class PremiumBilling(
     fun isPremiumSetupRequired(): Boolean = prefs.getBoolean("premium_setup_required", false)
 
     fun recheckOwnedPurchases() {
+        val pending = prefs.getString("pending_purchase_token", null)
+        if (pending != null) verifyAndSetPremium(pending)
         queryOwned()
     }
 
@@ -105,7 +107,10 @@ class PremiumBilling(
         if (result.responseCode != BillingClient.BillingResponseCode.OK) return
         purchases.orEmpty().filter { it.products.contains(PRODUCT_ID) && it.purchaseState == Purchase.PurchaseState.PURCHASED }
             .forEach { purchase ->
-                prefs.edit().putBoolean("premium_setup_required", true).apply()
+                prefs.edit()
+                    .putBoolean("premium_setup_required", true)
+                    .putString("pending_purchase_token", purchase.purchaseToken)
+                    .apply()
                 onPurchaseDetected()
 
                 if (!purchase.isAcknowledged) {
@@ -127,7 +132,11 @@ class PremiumBilling(
             runCatching { verifyPurchase(purchaseToken) }
                 .onSuccess { verified ->
                     if (verified) {
-                        prefs.edit().putBoolean("premium", true).putBoolean("premium_setup_required", false).apply()
+                        prefs.edit()
+                            .putBoolean("premium", true)
+                            .putBoolean("premium_setup_required", false)
+                            .remove("pending_purchase_token")
+                            .apply()
                         onPremiumChanged(true)
                     }
                 }
