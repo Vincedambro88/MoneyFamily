@@ -18,7 +18,8 @@ fun PremiumSection(
     supabaseRepo: SupabaseRepository,
     isPremium: Boolean,
     onPremiumChanged: (Boolean) -> Unit,
-    onAccountChanged: () -> Unit
+    onAccountChanged: () -> Unit,
+    authRefreshVersion: Int = 0
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -52,7 +53,7 @@ fun PremiumSection(
         }
     }
 
-    LaunchedEffect(refreshKey, isPremium, setupRequired) {
+    LaunchedEffect(refreshKey, isPremium, setupRequired, authRefreshVersion) {
         loadAccount()
         if (setupRequired && email != null && familyId != null && !isPremium) {
             billing.recheckOwnedPurchases()
