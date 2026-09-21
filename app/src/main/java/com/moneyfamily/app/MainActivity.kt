@@ -49,6 +49,7 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
  val c=LocalContext.current
  val repo=remember{RoomRepository(c)}
  val supabaseRepo=remember{SupabaseRepository()}
+ val cloudSync=remember{CloudSyncRepository(repo,supabaseRepo)}
  val scope=rememberCoroutineScope()
  var data by remember{mutableStateOf<List<UiMovement>>(emptyList())}
  var types by remember{mutableStateOf<List<TypeEntity>>(emptyList())}
@@ -78,10 +79,10 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
     )
 }
  fun refresh(){scope.launch{data=repo.all().map{it.ui()};types=repo.allTypes();cats=repo.allCategories();members=repo.allMembers();links=repo.allMappings()}}
- LaunchedEffect(Unit){premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{isPremium=supabaseRepo.isPremiumForCurrentFamily()}}else{isPremium=premiumBilling.isPremium()}}
+ LaunchedEffect(Unit){premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{isPremium=supabaseRepo.isPremiumForCurrentFamily();cloudSync.sync().onSuccess{refresh()}}}else{isPremium=premiumBilling.isPremium()}}
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
- fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh()}}
- fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh()}}
+ fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh();if(SupabaseClientProvider.isConfigured)cloudSync.sync().onSuccess{refresh()}}}
+ fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh();if(SupabaseClientProvider.isConfigured)cloudSync.sync().onSuccess{refresh()}}}
  MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni","Budget").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={Icon(
  when(i){
   0->Icons.Outlined.Dashboard
