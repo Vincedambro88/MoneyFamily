@@ -13,5 +13,6 @@ data class MovementEntity(
     val description: String,
     val date: String,
     val member: String,
-    val paymentMethod: String
+    val paymentMethod: String,
+    val cloudId: String? = null
 )
