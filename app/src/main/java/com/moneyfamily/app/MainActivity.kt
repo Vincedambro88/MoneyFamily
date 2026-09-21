@@ -394,16 +394,16 @@ private val ChartColors=listOf(
  var section by remember{mutableStateOf(0)}
  Column(Modifier.fillMaxSize().padding(16.dp)){
   Text("Configurazione",style=MaterialTheme.typography.headlineSmall)
-  PremiumSection(billing,supabaseRepo,isPremium,onPremiumChanged,onAccountChanged,authRefreshVersion)
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(2.dp)){
-   listOf("Tipologie","Categorie","Famiglia","Associazioni").forEachIndexed{i,t->TextButton(onClick={section=i}){Text(t)}}
+   listOf("Premium","Tipologie","Categorie","Famiglia","Associazioni").forEachIndexed{i,t->TextButton(onClick={section=i}){Text(t)}}
   }
   Box(Modifier.fillMaxWidth().weight(1f)){
    when(section){
-    0->ConfigTypesV2(types,repo,refresh)
-    1->ConfigCatsV2(cats,repo,refresh)
-    2->ConfigMembersV2(members,repo,refresh)
-    3->ConfigLinksV2(types,cats,links,repo,refresh)
+    0->PremiumSection(billing,supabaseRepo,isPremium,onPremiumChanged,onAccountChanged,authRefreshVersion)
+    1->ConfigTypesV2(types,repo,refresh)
+    2->ConfigCatsV2(cats,repo,refresh)
+    3->ConfigMembersV2(members,repo,refresh)
+    4->ConfigLinksV2(types,cats,links,repo,refresh)
    }
   }
  }
