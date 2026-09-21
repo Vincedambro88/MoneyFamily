@@ -22,7 +22,7 @@ class SupabaseRepository(
     }
 
     suspend fun signUp(email: String, password: String): String? = withContext(Dispatchers.IO) {
-        client.auth.signUpWith(Email) {
+        client.auth.signUpWith(Email, redirectUrl = SupabaseClientProvider.AUTH_REDIRECT_URL) {
             this.email = email.trim()
             this.password = password
         }
