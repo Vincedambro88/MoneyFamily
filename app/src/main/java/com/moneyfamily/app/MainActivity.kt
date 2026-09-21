@@ -46,8 +46,8 @@ private val mf = SimpleDateFormat("MMMM yyyy", Locale.ITALIAN)
 data class UiMovement(val id:Long,val type:MovementType,val amount:Double,val category:String,val description:String,val date:String,val member:String,val typeName:String = "")
 class MainActivity:ComponentActivity(){
  private var authRefreshVersion by mutableIntStateOf(0)
- override fun onCreate(s:Bundle?){super.onCreate(s);SupabaseClientProvider.client.handleDeeplinks(intent);setContent{MoneyFamilyApp(authRefreshVersion)}}
- override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);SupabaseClientProvider.client.handleDeeplinks(intent);authRefreshVersion++}
+ override fun onCreate(s:Bundle?){super.onCreate(s);if(SupabaseClientProvider.isConfigured)SupabaseClientProvider.client.handleDeeplinks(intent);setContent{MoneyFamilyApp(authRefreshVersion)}}
+ override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);if(SupabaseClientProvider.isConfigured)SupabaseClientProvider.client.handleDeeplinks(intent);authRefreshVersion++}
 }
 
 @Composable private fun MoneyFamilyApp(authRefreshVersion:Int=0){
