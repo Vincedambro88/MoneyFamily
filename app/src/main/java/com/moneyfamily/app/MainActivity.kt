@@ -12,6 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -33,6 +34,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import kotlin.math.abs
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import com.moneyfamily.app.data.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
@@ -87,27 +89,20 @@ class MainActivity:ComponentActivity(){
     )
 }
  fun refresh(){scope.launch{data=repo.all().map{it.ui()};types=repo.allTypes();cats=repo.allCategories();members=repo.allMembers();links=repo.allMappings()}}
- LaunchedEffect(Unit, authRefreshVersion){premiumSetupRequired=premiumBilling.isPremiumSetupRequired();premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{isPremium=supabaseRepo.isPremiumForCurrentFamily();cloudSync.sync().onSuccess{refresh()}}}else{isPremium=premiumBilling.isPremium()}}
+ LaunchedEffect(Unit, authRefreshVersion){premiumSetupRequired=premiumBilling.isPremiumSetupRequired();premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{isPremium=supabaseRepo.isPremiumForCurrentAccount();cloudSync.sync().onSuccess{refresh()}}}else{isPremium=premiumBilling.isPremium()}}
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
  fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh();if(SupabaseClientProvider.isConfigured)cloudSync.sync().onSuccess{refresh()}}}
  fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh();if(SupabaseClientProvider.isConfigured)cloudSync.sync().onSuccess{refresh()}}}
- MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni","Budget").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={Icon(
+ MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni","Budget","Premium").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={
  when(i){
-  0->Icons.Outlined.Dashboard
-  1->Icons.Outlined.ListAlt
-  2->Icons.Outlined.AddCircle
-  3->Icons.Outlined.Settings
-  else->Icons.Outlined.AccountBalanceWallet
- },
- contentDescription=t,
- tint=when(i){
-  0->androidx.compose.ui.graphics.Color(0xFF2563EB)
-  1->androidx.compose.ui.graphics.Color(0xFF7C3AED)
-  2->androidx.compose.ui.graphics.Color(0xFF16A34A)
-  3->androidx.compose.ui.graphics.Color(0xFFEA580C)
-  else->androidx.compose.ui.graphics.Color(0xFF0891B2)
+  0->Icon(Icons.Outlined.Dashboard,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF2563EB))
+  1->Icon(Icons.Outlined.ListAlt,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF7C3AED))
+  2->Icon(Icons.Outlined.AddCircle,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF16A34A))
+  3->Icon(Icons.Outlined.Settings,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFFEA580C))
+  4->Icon(Icons.Outlined.AccountBalanceWallet,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF0891B2))
+  else->Icon(painterResource(R.drawable.ic_premium),contentDescription=t,tint=androidx.compose.ui.graphics.Color.Unspecified)
  }
-)},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh()}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()},premiumBilling,isPremium,supabaseRepo,authRefreshVersion,{v->isPremium=v;premiumSetupRequired=premiumBilling.isPremiumSetupRequired()},{scope.launch{cloudSync.sync().onSuccess{refresh()}}});4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
+},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh()}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()});4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium);5->PremiumSection(premiumBilling,supabaseRepo,isPremium,{v->isPremium=v;premiumSetupRequired=premiumBilling.isPremiumSetupRequired()},{scope.launch{if(SupabaseClientProvider.isConfigured){isPremium=supabaseRepo.isPremiumForCurrentAccount();cloudSync.sync().onSuccess{refresh()}}} },authRefreshVersion)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
 }
 
 @Composable private fun Dashboard(data:List<UiMovement>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit,isPremium:Boolean){
@@ -390,20 +385,19 @@ private val ChartColors=listOf(
  if(showEditor)Editor(null,types,cats,members,links,repo,{showEditor=false}){save(it);showEditor=false}
 }
 
-@Composable private fun Configuration(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit,billing:PremiumBilling,isPremium:Boolean,supabaseRepo:SupabaseRepository,authRefreshVersion:Int,onPremiumChanged:(Boolean)->Unit,onAccountChanged:()->Unit){
+@Composable private fun Configuration(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit){
  var section by remember{mutableStateOf(0)}
  Column(Modifier.fillMaxSize().padding(16.dp)){
   Text("Configurazione",style=MaterialTheme.typography.headlineSmall)
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(2.dp)){
-   listOf("Premium","Tipologie","Categorie","Famiglia","Associazioni").forEachIndexed{i,t->TextButton(onClick={section=i}){Text(t)}}
+   listOf("Tipologie","Categorie","Famiglia","Associazioni").forEachIndexed{i,t->TextButton(onClick={section=i}){Text(t)}}
   }
   Box(Modifier.fillMaxWidth().weight(1f)){
    when(section){
-    0->PremiumSection(billing,supabaseRepo,isPremium,onPremiumChanged,onAccountChanged,authRefreshVersion)
-    1->ConfigTypesV2(types,repo,refresh)
-    2->ConfigCatsV2(cats,repo,refresh)
-    3->ConfigMembersV2(members,repo,refresh)
-    4->ConfigLinksV2(types,cats,links,repo,refresh)
+    0->ConfigTypesV2(types,repo,refresh)
+    1->ConfigCatsV2(cats,repo,refresh)
+    2->ConfigMembersV2(members,repo,refresh)
+    3->ConfigLinksV2(types,cats,links,repo,refresh)
    }
   }
  }
