@@ -37,8 +37,13 @@ class RoomRepository(private val context: Context) {
         dao.update(current.copy(cloudId = cloudId))
     }
 
-    suspend fun insertCloud(item: Movement, cloudId: String) {
-        dao.insert(item.toEntity().copy(cloudId = cloudId))
+    suspend fun insertCloud(item: Movement, cloudId: String, updatedAt: String = java.time.Instant.now().toString()) {
+        dao.insert(item.toEntity().copy(cloudId = cloudId, updatedAt = updatedAt))
+    }
+
+    suspend fun updateCloud(item: Movement, cloudId: String, updatedAt: String) {
+        val current = dao.getAll().firstOrNull { it.cloudId == cloudId } ?: return
+        dao.update(item.toEntity().copy(id = current.id, cloudId = cloudId, updatedAt = updatedAt))
     }
 
     suspend fun allTypes(): List<TypeEntity> { seedDefaults(); return types.active() }
