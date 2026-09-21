@@ -7,12 +7,16 @@ import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.postgrest.Postgrest
 
 object SupabaseClientProvider {
+    const val AUTH_REDIRECT_URL = "moneyfamily://auth-callback"
+
     val client: SupabaseClient by lazy {
         createSupabaseClient(
             supabaseUrl = BuildConfig.SUPABASE_URL,
             supabaseKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
         ) {
             install(Auth) {
+                host = "auth-callback"
+                scheme = "moneyfamily"
                 autoLoadFromStorage = true
                 alwaysAutoRefresh = true
             }
