@@ -1,0 +1,1 @@
+Rebuild auth callback APK after Supabase Android deep-link fix.
