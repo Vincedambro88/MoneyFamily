@@ -6,7 +6,7 @@ import androidx.room.withTransaction
 
 class RoomRepository(private val context: Context) {
     private val db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "moneyfamily.db")
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+         .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
         .build()
     private val dao = db.movementDao()
     private val types = db.typeDao()
