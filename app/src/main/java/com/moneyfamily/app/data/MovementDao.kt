@@ -24,6 +24,9 @@ interface MovementDao {
     @Delete
     suspend fun delete(item: MovementEntity)
 
+    @Query("DELETE FROM movements WHERE cloudId = :cloudId")
+    suspend fun deleteByCloudId(cloudId: String)
+
     @Query("DELETE FROM movements")
     suspend fun deleteAll()
 }
