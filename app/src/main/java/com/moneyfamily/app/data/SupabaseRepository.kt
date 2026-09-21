@@ -69,3 +69,23 @@ class SupabaseRepository(
         ).decodeSingle<String>()
     }
 }
+
+
+    suspend fun isPremiumForCurrentFamily(): Boolean = withContext(Dispatchers.IO) {
+        val family = familiesForCurrentUser().firstOrNull() ?: return@withContext false
+        client.postgrest.rpc(
+            "family_has_active_premium",
+            buildJsonObject { put("p_family_id", family.id) }
+        ).decodeSingle<Boolean>()
+    }
+
+    suspend fun verifyPremiumPurchase(purchaseToken: String): Boolean = withContext(Dispatchers.IO) {
+        client.functions.invoke(
+            function = "verify-premium-purchase",
+            body = buildJsonObject {
+                put("purchaseToken", purchaseToken)
+                put("productId", "moneyfamily_premium")
+            }
+        )
+        true
+    }
