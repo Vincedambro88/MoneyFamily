@@ -2,6 +2,7 @@ package com.moneyfamily.app
 
 import android.app.DatePickerDialog
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -43,9 +44,13 @@ private val money = NumberFormat.getCurrencyInstance(Locale.ITALY)
 private val df = SimpleDateFormat("dd/MM/yyyy", Locale.ITALY)
 private val mf = SimpleDateFormat("MMMM yyyy", Locale.ITALIAN)
 data class UiMovement(val id:Long,val type:MovementType,val amount:Double,val category:String,val description:String,val date:String,val member:String,val typeName:String = "")
-class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.onCreate(s);setContent{MoneyFamilyApp()}}}
+class MainActivity:ComponentActivity(){
+ private var authRefreshVersion by mutableIntStateOf(0)
+ override fun onCreate(s:Bundle?){super.onCreate(s);SupabaseClientProvider.client.handleDeeplinks(intent);setContent{MoneyFamilyApp(authRefreshVersion)}}
+ override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);SupabaseClientProvider.client.handleDeeplinks(intent);authRefreshVersion++}
+}
 
-@Composable private fun MoneyFamilyApp(){
+@Composable private fun MoneyFamilyApp(authRefreshVersion:Int=0){
  val c=LocalContext.current
  val repo=remember{RoomRepository(c)}
  val supabaseRepo=remember{SupabaseRepository()}
@@ -61,6 +66,7 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
  var edit by remember{mutableStateOf<UiMovement?>(null)}
  var add by remember{mutableStateOf(false)}
  var isPremium by remember{mutableStateOf(false)}
+ var premiumSetupRequired by remember{mutableStateOf(false)}
  val premiumBilling=remember {
     PremiumBilling(
         c,
@@ -70,16 +76,18 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
         },
         onPremiumChanged = {
             isPremium = true
+            premiumSetupRequired = false
             scope.launch {
                 if (SupabaseClientProvider.isConfigured) {
                     isPremium = supabaseRepo.isPremiumForCurrentFamily()
                 }
             }
-        }
+        },
+        onPurchaseDetected = { premiumSetupRequired = true }
     )
 }
  fun refresh(){scope.launch{data=repo.all().map{it.ui()};types=repo.allTypes();cats=repo.allCategories();members=repo.allMembers();links=repo.allMappings()}}
- LaunchedEffect(Unit){premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{isPremium=supabaseRepo.isPremiumForCurrentFamily();cloudSync.sync().onSuccess{refresh()}}}else{isPremium=premiumBilling.isPremium()}}
+ LaunchedEffect(Unit, authRefreshVersion){premiumSetupRequired=premiumBilling.isPremiumSetupRequired();premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{isPremium=supabaseRepo.isPremiumForCurrentFamily();cloudSync.sync().onSuccess{refresh()}}}else{isPremium=premiumBilling.isPremium()}}
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
  fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh();if(SupabaseClientProvider.isConfigured)cloudSync.sync().onSuccess{refresh()}}}
  fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh();if(SupabaseClientProvider.isConfigured)cloudSync.sync().onSuccess{refresh()}}}
@@ -99,7 +107,7 @@ class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.on
   3->androidx.compose.ui.graphics.Color(0xFFEA580C)
   else->androidx.compose.ui.graphics.Color(0xFF0891B2)
  }
-)},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh()}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()},premiumBilling,isPremium,supabaseRepo);4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
+)},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh()}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()},premiumBilling,isPremium,supabaseRepo,premiumSetupRequired,authRefreshVersion,{scope.launch{cloudSync.sync().onSuccess{refresh()}}});4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
 }
 
 @Composable private fun Dashboard(data:List<UiMovement>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit,isPremium:Boolean){
@@ -382,12 +390,11 @@ private val ChartColors=listOf(
  if(showEditor)Editor(null,types,cats,members,links,repo,{showEditor=false}){save(it);showEditor=false}
 }
 
-@Composable private fun Configuration(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit,billing:PremiumBilling,isPremium:Boolean,supabaseRepo:SupabaseRepository){
+@Composable private fun Configuration(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit,billing:PremiumBilling,isPremium:Boolean,supabaseRepo:SupabaseRepository,premiumSetupRequired:Boolean,authRefreshVersion:Int,onAccountChanged:()->Unit){
  var section by remember{mutableStateOf(0)}
  Column(Modifier.fillMaxSize().padding(16.dp)){
   Text("Configurazione",style=MaterialTheme.typography.headlineSmall)
-  PremiumCard(billing,isPremium)
-  CloudAccountCard(supabaseRepo,isPremium)
+  PremiumSection(billing,supabaseRepo,isPremium,{v->if(v){refresh()}},onAccountChanged,authRefreshVersion)
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(2.dp)){
    listOf("Tipologie","Categorie","Famiglia","Associazioni").forEachIndexed{i,t->TextButton(onClick={section=i}){Text(t)}}
   }
