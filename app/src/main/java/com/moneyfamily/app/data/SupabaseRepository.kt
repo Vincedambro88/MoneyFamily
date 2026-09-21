@@ -68,10 +68,8 @@ class SupabaseRepository(
             parameters
         ).decodeSingle<String>()
     }
-}
 
-
-    suspend fun isPremiumForCurrentFamily(): Boolean = withContext(Dispatchers.IO) {
+suspend fun isPremiumForCurrentFamily(): Boolean = withContext(Dispatchers.IO) {
         val family = familiesForCurrentUser().firstOrNull() ?: return@withContext false
         client.postgrest.rpc(
             "family_has_active_premium",
@@ -89,3 +87,4 @@ class SupabaseRepository(
         )
         true
     }
+}
