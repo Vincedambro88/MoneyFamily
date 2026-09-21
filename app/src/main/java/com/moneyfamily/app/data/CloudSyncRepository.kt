@@ -61,9 +61,48 @@ class CloudSyncRepository(
             memberIds[local.id.toString()] = id
         }
 
-        room.allMappings().forEach { mapping ->
-            val typeId = typeIds[mapping.typeId.toString()] ?: return@forEach
-            val categoryId = categoryIds[mapping.categoryId.toString()] ?: return@forEach
+        // Import reference data created on another device before pushing local changes.
+        for (remote in remoteTypes) {
+            if (localTypes.none { it.name.equals(remote.name, true) }) {
+                room.addType(remote.name)
+            }
+        }
+        for (remote in remoteCategories) {
+            if (localCategories.none { it.name.equals(remote.name, true) }) {
+                room.addCategory(remote.name)
+            }
+        }
+        for (remote in remoteMembers) {
+            if (localMembers.none { it.name.equals(remote.displayName, true) }) {
+                room.addMember(remote.displayName)
+            }
+        }
+
+        // Re-read local reference data after imports so remote-only values can be mapped locally.
+        val syncedTypes = room.allTypes()
+        val syncedCategories = room.allCategories()
+        val syncedMembers = room.allMembers()
+        val syncedTypeIds = syncedTypes.associateBy { it.name.lowercase() }
+        val syncedCategoryIds = syncedCategories.associateBy { it.name.lowercase() }
+
+        for (remoteLink in supabase.client.from("type_category_links").select {
+            filter { eq("family_id", familyId) }
+        }.decodeList<CloudTypeCategoryLinkDto>()) {
+            val remoteType = remoteTypes.firstOrNull { it.id == remoteLink.typologyId } ?: continue
+            val remoteCategory = remoteCategories.firstOrNull { it.id == remoteLink.categoryId } ?: continue
+            val localType = syncedTypeIds[remoteType.name.lowercase()] ?: continue
+            val localCategory = syncedCategoryIds[remoteCategory.name.lowercase()] ?: continue
+            room.setTypeCategory(localType.id, localCategory.id)
+        }
+
+        // Push local mappings as well, including mappings created after the import.
+        for (mapping in room.allMappings()) {
+            val type = syncedTypes.firstOrNull { it.id == mapping.typeId } ?: continue
+            val category = syncedCategories.firstOrNull { it.id == mapping.categoryId } ?: continue
+            val typeId = remoteTypes.firstOrNull { it.name.equals(type.name, true) }?.id
+                ?: UUID.nameUUIDFromBytes((familyId + ":type:" + type.name.lowercase()).toByteArray()).toString()
+            val categoryId = remoteCategories.firstOrNull { it.name.equals(category.name, true) }?.id
+                ?: UUID.nameUUIDFromBytes((familyId + ":category:" + category.name.lowercase()).toByteArray()).toString()
             supabase.client.from("type_category_links").upsert(
                 CloudTypeCategoryLinkDto(familyId, typeId, categoryId)
             )
@@ -117,7 +156,9 @@ class CloudSyncRepository(
             val typeName = remoteTypes.firstOrNull { it.id == remote.typologyId }?.name.orEmpty()
             val category = remoteCategories.firstOrNull { it.id == remote.categoryId }?.name.orEmpty()
             val member = remoteMembers.firstOrNull { it.id == remote.memberId }?.displayName.orEmpty()
-            val generatedId = (remote.id.hashCode().toLong() and Long.MAX_VALUE)
+            val usedIds = room.allEntities().map { it.id }.toHashSet()
+            var generatedId = -(remote.id.hashCode().toLong() and Long.MAX_VALUE).coerceAtLeast(1L)
+            while (generatedId in usedIds) generatedId--
             room.insertCloud(
                 Movement(
                     id = generatedId,
