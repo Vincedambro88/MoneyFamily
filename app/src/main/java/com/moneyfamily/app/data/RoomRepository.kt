@@ -6,13 +6,14 @@ import androidx.room.withTransaction
 
 class RoomRepository(private val context: Context) {
     private val db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "moneyfamily.db")
-         .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+         .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
         .build()
     private val dao = db.movementDao()
     private val types = db.typeDao()
     private val categories = db.categoryDao()
     private val members = db.familyMemberDao()
     private val mappings = db.typeCategoryDao()
+    private val tombstones = db.operationTombstoneDao()
 
     suspend fun all(): List<Movement> = dao.getAll().map { it.toModel() }
     suspend fun allEntities(): List<MovementEntity> = dao.getAll()
@@ -21,8 +22,14 @@ class RoomRepository(private val context: Context) {
         val current = dao.getAll().firstOrNull { it.id == item.id }
         dao.update(item.toEntity().copy(cloudId = current?.cloudId))
     }
-    suspend fun delete(item: Movement) = dao.delete(item.toEntity())
-    suspend fun deleteAll(items: List<Movement>) { items.forEach { dao.delete(it.toEntity()) } }
+    suspend fun delete(item: Movement) {
+        val current = dao.getAll().firstOrNull { it.id == item.id }
+        current?.cloudId?.let { tombstones.insert(OperationTombstone(it, java.time.Instant.now().toString())) }
+        dao.delete(item.toEntity())
+    }
+    suspend fun deleteAll(items: List<Movement>) { items.forEach { delete(it) } }
+    suspend fun allTombstones(): List<OperationTombstone> = tombstones.getAll()
+    suspend fun removeTombstone(cloudId: String) = tombstones.delete(cloudId)
     suspend fun setCloudId(localId: Long, cloudId: String) {
         val current = dao.getAll().firstOrNull { it.id == localId } ?: return
         dao.update(current.copy(cloudId = cloudId))
