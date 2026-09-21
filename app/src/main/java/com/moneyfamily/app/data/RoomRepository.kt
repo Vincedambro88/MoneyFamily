@@ -19,7 +19,7 @@ class RoomRepository(private val context: Context) {
     suspend fun update(item: Movement) = dao.update(item.toEntity())
     suspend fun delete(item: Movement) = dao.delete(item.toEntity())
     suspend fun deleteAll(items: List<Movement>) { items.forEach { dao.delete(it.toEntity()) } }
-
+    suspend fun setCloudId(localId: Long, cloudId: String) {\n        val current = dao.getAll().firstOrNull { it.id == localId } ?: return\n        dao.update(current.copy(cloudId = cloudId))\n    }\n\n    suspend fun insertCloud(item: Movement, cloudId: String) {\n        dao.insert(item.toEntity().copy(cloudId = cloudId))\n    }\n
     suspend fun allTypes(): List<TypeEntity> { seedDefaults(); return types.active() }
     suspend fun activeTypes(): List<TypeEntity> { seedDefaults(); return types.active() }
     suspend fun addType(name: String) = types.insert(TypeEntity(name = name.trim()))
