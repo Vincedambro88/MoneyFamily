@@ -112,8 +112,32 @@ class CloudSyncRepository(
     private suspend fun syncOperations(familyId: String) {
         val local = room.allEntities()
 
-        // Publish offline deletions before uploading local operations, preventing deleted rows from being recreated.
+        val remoteTypes = supabase.client.from("typologies").select {
+            filter { eq("family_id", familyId) }
+        }.decodeList<CloudTypologyDto>()
+        val remoteCategories = supabase.client.from("categories").select {
+            filter { eq("family_id", familyId) }
+        }.decodeList<CloudCategoryDto>()
+        val remoteMembers = supabase.client.from("family_members").select {
+            filter { eq("family_id", familyId) }
+        }.decodeList<CloudMemberDto>()
+
+        // Read the remote state before publishing local deletions. A tombstone must never
+        // overwrite a newer remote edit.
+        val remoteOperationsBeforePush = supabase.client.from("operations").select {
+            filter { eq("family_id", familyId) }
+        }.decodeList<CloudOperationDto>()
+        val remoteById = remoteOperationsBeforePush.associateBy { it.id }
+
         for (tombstone in room.allTombstones()) {
+            val remote = remoteById[tombstone.cloudId]
+            if (remote != null && remote.updatedAt.isAfterTimestamp(tombstone.deletedAt)) {
+                // A newer remote version wins; leave the tombstone consumed and let the
+                // normal remote-import phase restore the operation if it is still active.
+                room.removeTombstone(tombstone.cloudId)
+                continue
+            }
+
             supabase.client.from("operations").upsert(
                 CloudOperationDto(
                     id = tombstone.cloudId,
@@ -130,56 +154,53 @@ class CloudSyncRepository(
             room.removeTombstone(tombstone.cloudId)
         }
 
-        val remoteTypes = supabase.client.from("typologies").select {
-            filter { eq("family_id", familyId) }
-        }.decodeList<CloudTypologyDto>()
-        val remoteCategories = supabase.client.from("categories").select {
-            filter { eq("family_id", familyId) }
-        }.decodeList<CloudCategoryDto>()
-        val remoteMembers = supabase.client.from("family_members").select {
-            filter { eq("family_id", familyId) }
-        }.decodeList<CloudMemberDto>()
-
-        val remoteOperationsBeforePush = supabase.client.from("operations").select {
-            filter { eq("family_id", familyId) }
-        }.decodeList<CloudOperationDto>()
-        val remoteById = remoteOperationsBeforePush.associateBy { it.id }
-
         local.forEach { movement ->
-            val cloudId = movement.cloudId ?: UUID.nameUUIDFromBytes((familyId + ":operation:" + movement.id).toByteArray()).toString()
+            val cloudId = movement.cloudId ?: UUID.nameUUIDFromBytes(
+                (familyId + ":operation:" + movement.id).toByteArray()
+            ).toString()
             val remote = remoteById[cloudId]
+
             if (remote != null && remote.deletedAt != null) {
-                if (remote.updatedAt >= movement.updatedAt) {
+                if (!movement.updatedAt.isAfterTimestamp(remote.updatedAt)) {
                     room.deleteByCloudId(cloudId)
                     return@forEach
                 }
             }
-            if (remote != null && remote.updatedAt > movement.updatedAt) {
+
+            if (remote != null && remote.updatedAt.isAfterTimestamp(movement.updatedAt)) {
                 val typeName = remoteTypes.firstOrNull { it.id == remote.typologyId }?.name.orEmpty()
                 val category = remoteCategories.firstOrNull { it.id == remote.categoryId }?.name.orEmpty()
                 val member = remoteMembers.firstOrNull { it.id == remote.memberId }?.displayName.orEmpty()
-                room.updateCloud(
-                    Movement(
-                        id = movement.id,
-                        type = if (remote.amount >= 0) MovementType.INCOME else MovementType.EXPENSE,
-                        amount = remote.amount,
-                        category = category,
-                        description = remote.description,
-                        date = remote.operationDate.fromSupabaseDate(),
-                        member = member,
-                        paymentMethod = remote.paymentMethod,
-                        typeName = typeName
-                    ),
-                    cloudId,
-                    remote.updatedAt
-                )
+                if (remote.deletedAt != null) {
+                    room.deleteByCloudId(cloudId)
+                } else {
+                    room.updateCloud(
+                        Movement(
+                            id = movement.id,
+                            type = if (remote.amount >= 0) MovementType.INCOME else MovementType.EXPENSE,
+                            amount = remote.amount,
+                            category = category,
+                            description = remote.description,
+                            date = remote.operationDate.fromSupabaseDate(),
+                            member = member,
+                            paymentMethod = remote.paymentMethod,
+                            typeName = typeName
+                        ),
+                        cloudId,
+                        remote.updatedAt
+                    )
+                }
                 return@forEach
             }
 
             val typologyId = remoteTypes.firstOrNull { it.name.equals(movement.typeName, true) }?.id
             val categoryId = remoteCategories.firstOrNull { it.name.equals(movement.category, true) }?.id
             val memberId = remoteMembers.firstOrNull { it.displayName.equals(movement.member, true) }?.id
-            val timestamp = if (movement.updatedAt > "2000-01-01T00:00:00Z") movement.updatedAt else java.time.Instant.now().toString()
+            val timestamp = if (movement.updatedAt.isAfterTimestamp("2000-01-01T00:00:00Z")) {
+                movement.updatedAt
+            } else {
+                java.time.Instant.now().toString()
+            }
 
             supabase.client.from("operations").upsert(
                 CloudOperationDto(
@@ -197,13 +218,14 @@ class CloudSyncRepository(
                     deletedAt = null
                 )
             )
-            room.setCloudId(movement.id, cloudId)
+            room.setCloudId(movement.id, cloudId, timestamp)
         }
+
         val remoteOperations = supabase.client.from("operations").select {
             filter { eq("family_id", familyId) }
         }.decodeList<CloudOperationDto>()
 
-        val existingCloudIds = room.allEntities().mapNotNull { entity -> entity.cloudId }.toSet()
+        val existingCloudIds = room.allEntities().mapNotNull { it.cloudId }.toSet()
         for (remote in remoteOperations) {
             if (remote.deletedAt != null) {
                 if (remote.id in existingCloudIds) room.deleteByCloudId(remote.id)
@@ -211,12 +233,14 @@ class CloudSyncRepository(
                 continue
             }
             if (remote.id in existingCloudIds) continue
+
             val typeName = remoteTypes.firstOrNull { it.id == remote.typologyId }?.name.orEmpty()
             val category = remoteCategories.firstOrNull { it.id == remote.categoryId }?.name.orEmpty()
             val member = remoteMembers.firstOrNull { it.id == remote.memberId }?.displayName.orEmpty()
             val usedIds = room.allEntities().map { it.id }.toHashSet()
             var generatedId = -(remote.id.hashCode().toLong() and Long.MAX_VALUE).coerceAtLeast(1L)
             while (generatedId in usedIds) generatedId--
+
             room.insertCloud(
                 Movement(
                     id = generatedId,
@@ -229,10 +253,16 @@ class CloudSyncRepository(
                     paymentMethod = remote.paymentMethod,
                     typeName = typeName
                 ),
-                remote.id
+                remote.id,
+                remote.updatedAt
             )
         }
     }
+
+    private fun String.isAfterTimestamp(other: String): Boolean =
+        runCatching { java.time.Instant.parse(this).isAfter(java.time.Instant.parse(other)) }
+            .getOrElse { this > other }
+
 
     private fun String.toSupabaseDate(): String {
         val parts = split("/")
