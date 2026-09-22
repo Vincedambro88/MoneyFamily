@@ -119,7 +119,7 @@ fun PremiumSection(
                     Text("• Confronto dei costi effettivi tra due mesi oppure due anni.")
                     Text("• Confronto per tipologia e per categoria.")
                     Text("• Salvataggio e sincronizzazione Cloud tramite Supabase.")
-                    Text("• Accesso agli stessi dati da più dispositivi con lo stesso account.")
+                    Text("• Accesso condiviso allo stesso account per tutta la famiglia, così da aggiornare i dati online da più dispositivi.")
 
                     if (!isPremium && !setupRequired) {
                         val price = billing.price()
@@ -139,6 +139,19 @@ fun PremiumSection(
                                 style = MaterialTheme.typography.labelSmall
                             )
                         }
+                    }
+
+                    if (BuildConfig.INTERNAL_PREMIUM_TEST && !isPremium) {
+                        OutlinedButton(
+                            onClick = { billing.enableInternalTestPremium() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Sblocca Premium per test")
+                        }
+                        Text(
+                            "Solo versione Test interno: attiva Premium localmente per verificare tutte le funzioni senza effettuare un acquisto.",
+                            style = MaterialTheme.typography.labelSmall
+                        )
                     }
 
                     if (isPremium) {
