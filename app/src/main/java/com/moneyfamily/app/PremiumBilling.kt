@@ -48,7 +48,14 @@ class PremiumBilling(
         })
     }
 
-    fun isPremium(): Boolean = prefs.getBoolean("premium", false)
+    fun isPremium(): Boolean = prefs.getBoolean("premium", false) || (BuildConfig.INTERNAL_PREMIUM_TEST && prefs.getBoolean("internal_test_premium", false))
+
+    /** Enables Premium only in the dedicated internal-test build. */
+    fun enableInternalTestPremium() {
+        if (!BuildConfig.INTERNAL_PREMIUM_TEST) return
+        prefs.edit().putBoolean("internal_test_premium", true).putBoolean("premium", true).apply()
+        onPremiumChanged(true)
+    }
 
     fun isPremiumSetupRequired(): Boolean = prefs.getBoolean("premium_setup_required", false)
 
