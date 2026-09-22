@@ -1,5 +1,7 @@
 package com.moneyfamily.app.data
 
+import com.moneyfamily.app.BuildConfig
+
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.functions.functions
@@ -86,6 +88,7 @@ class SupabaseRepository(
     }
 
     suspend fun isPremiumForCurrentAccount(): Boolean = withContext(Dispatchers.IO) {
+        if (BuildConfig.INTERNAL_PREMIUM_TEST && client.auth.currentUserOrNull()?.id != null) return@withContext true
         if (client.auth.currentUserOrNull()?.id == null) return@withContext false
         val familyId = ensureAccountWorkspace()
         client.postgrest.rpc(
