@@ -98,3 +98,4 @@ jobs:
           if-no-files-found: error
 
 # Validate dedicated Premium account/cloud activation flow.
+# Release validation checkpoint: Premium account + Supabase multi-device flow.
