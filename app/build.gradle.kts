@@ -19,8 +19,8 @@ android {
         applicationId = "com.vdapps.moneyfamily"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.1.0"
+        versionCode = 8
+        versionName = "1.2.0"
 
         val localProperties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
@@ -29,6 +29,8 @@ android {
         }
         buildConfigField("String", "SUPABASE_URL", "\"" + localProperties.getProperty("SUPABASE_URL", "https://ncwvcrgxifjdagnkyjeb.supabase.co") + "\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_0kZN7saf26kRyqczbKbylA_hy0ehPT2") + "\"")
+        val internalPremiumTest = providers.gradleProperty("internalPremiumTest").map { it.toBoolean() }.orElse(false).get()
+        buildConfigField("Boolean", "INTERNAL_PREMIUM_TEST", internalPremiumTest.toString())
     }
 
 
