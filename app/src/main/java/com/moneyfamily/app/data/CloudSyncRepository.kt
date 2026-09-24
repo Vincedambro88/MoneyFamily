@@ -290,6 +290,7 @@ class CloudSyncRepository(
                         month = month,
                         amount = amount,
                         createdBy = supabase.currentUserId(),
+                        createdAt = java.time.Instant.now().toString(),
                         updatedAt = java.time.Instant.now().toString()
                     )
                 )
@@ -369,6 +370,7 @@ private data class CloudBudgetDto(
     val month: Int,
     val amount: Double,
     @SerialName("created_by") val createdBy: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String
 )
 
