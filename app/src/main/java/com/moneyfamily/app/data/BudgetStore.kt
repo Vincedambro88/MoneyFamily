@@ -14,6 +14,24 @@ class BudgetStore(context: Context) {
         return month.keys().asSequence().associateWith { month.optDouble(it, 0.0) }
     }
 
+    fun all(): Map<String, Map<String, Double>> {
+        val root = runCatching { JSONObject(prefs.getString("budgets", "{}") ?: "{}") }.getOrDefault(JSONObject())
+        return root.keys().asSequence().associateWith { key ->
+            val month = root.optJSONObject(key) ?: JSONObject()
+            month.keys().asSequence().associateWith { type -> month.optDouble(type, 0.0) }
+        }
+    }
+
+    fun replaceAll(values: Map<String, Map<String, Double>>) {
+        val root = JSONObject()
+        values.forEach { (monthKey, entries) ->
+            val month = JSONObject()
+            entries.forEach { (typeName, amount) -> month.put(typeName, amount.coerceAtLeast(0.0)) }
+            root.put(monthKey, month)
+        }
+        prefs.edit().putString("budgets", root.toString()).apply()
+    }
+
     fun set(monthKey: String, typeName: String, amount: Double) {
         val root = runCatching { JSONObject(prefs.getString("budgets", "{}") ?: "{}") }.getOrDefault(JSONObject())
         val month = root.optJSONObject(monthKey) ?: JSONObject().also { root.put(monthKey, it) }
