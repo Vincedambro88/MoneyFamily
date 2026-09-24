@@ -9,8 +9,13 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.boolean
+import io.ktor.client.statement.bodyAsText
 
 class SupabaseRepository(
     private val client: io.github.jan.supabase.SupabaseClient = SupabaseClientProvider.client
@@ -106,14 +111,15 @@ suspend fun isPremiumForCurrentFamily(): Boolean = runCatching {
         if (client.auth.currentUserOrNull()?.id == null) return@withContext false
         ensureAccountWorkspace()
         runCatching {
-            client.functions.invoke(
+            val response = client.functions.invoke(
                 function = "verify-premium-purchase",
                 body = buildJsonObject {
                     put("purchaseToken", purchaseToken)
                     put("productId", "moneyfamily_premium")
                 }
             )
-            true
+            val payload = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+            payload["premium"]?.jsonPrimitive?.boolean == true
         }.getOrDefault(false)
     }
 }
