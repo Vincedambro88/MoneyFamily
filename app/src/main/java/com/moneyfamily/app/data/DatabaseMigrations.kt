@@ -28,21 +28,16 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS operation_tombstones (cloudId TEXT NOT NULL PRIMARY KEY, deletedAt TEXT NOT NULL)")
     }
 }
 
+
 val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE movements ADD COLUMN updatedAt TEXT NOT NULL DEFAULT '2000-01-01T00:00:00Z'")
-    }
-}
-
-val MIGRATION_6_7 = object : Migration(6, 7) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        // Keep the existing cloudId uniqueness constraint aligned with the Room entity schema.
-        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_movements_cloudId ON movements(cloudId)")
     }
 }
