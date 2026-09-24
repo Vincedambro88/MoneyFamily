@@ -74,36 +74,7 @@ object ExcelImporter {
     private fun shared(b:ByteArray):List<String>{val d=DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(b.inputStream());val n=d.getElementsByTagName("si");return(0 until n.length).map{val e=n.item(it) as Element;val t=e.getElementsByTagName("t");(0 until t.length).joinToString(""){j->t.item(j).textContent}}}
     private fun sheet(b:ByteArray,shared:List<String>):List<List<String>>{
         val d=DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(b.inputStream());val rs=d.getElementsByTagName("row")
-        return (0 until rs.length).mapNotNull { ri ->
-            val r = rs.item(ri) as Element
-            val cs = r.getElementsByTagName("c")
-            val v = MutableList(32) { "" }
-
-            for (j in 0 until cs.length) {
-                val c = cs.item(j) as Element
-                val col = c.getAttribute("r").takeWhile { it.isLetter() }
-                if (col.isBlank()) continue
-
-                val idx = col.fold(0) { a, ch -> a * 26 + (ch - 'A' + 1) } - 1
-                if (idx < 0) continue
-                if (idx >= v.size) v.addAll(List(idx - v.size + 1) { "" })
-
-                val x = c.getElementsByTagName("v")
-                val inline = c.getElementsByTagName("t")
-                val raw = if (x.length > 0) x.item(0).textContent
-                else if (inline.length > 0) inline.item(0).textContent
-                else ""
-
-                v[idx] = if (c.getAttribute("t") == "s") {
-                    shared.getOrNull(raw.toIntOrNull() ?: -1).orEmpty()
-                } else {
-                    raw
-                }
-            }
-
-            while (v.isNotEmpty() && v.last().isBlank()) v.removeAt(v.lastIndex)
-            if (v.isEmpty()) null else v
-        }
+        return(0 until rs.length).map{ri->val r=rs.item(ri) as Element;val cs=r.getElementsByTagName("c");val v=MutableList(32){""};for(j in 0 until cs.length){val c=cs.item(j) as Element;val col=c.getAttribute("r").takeWhile{it.isLetter()};val idx=col.fold(0){a,ch->a*26+(ch-'A'+1)}-1;val x=c.getElementsByTagName("v");val inline=c.getElementsByTagName("t");val raw=if(x.length>0)x.item(0).textContent else if(inline.length>0)inline.item(0).textContent else "";v[idx]=if(c.getAttribute("t")=="s")shared.getOrNull(raw.toIntOrNull()?:-1).orEmpty() else raw};while(v.lastOrNull().isNullOrBlank())v.removeAt(v.lastIndex);v}
     }
     private fun norm(s:String)=s.trim().lowercase(Locale.ITALIAN).replace("_"," ").replace(Regex("\\s+")," ")
     private fun normalizeDate(v:String):String?{
