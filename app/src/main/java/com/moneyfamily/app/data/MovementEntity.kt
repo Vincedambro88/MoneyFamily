@@ -1,13 +1,9 @@
 package com.moneyfamily.app.data
 
 import androidx.room.Entity
-import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(
-    tableName = "movements",
-    indices = [Index(value = ["cloudId"], unique = true)]
-)
+@Entity(tableName = "movements")
 data class MovementEntity(
     @PrimaryKey val id: Long,
     val type: String,
