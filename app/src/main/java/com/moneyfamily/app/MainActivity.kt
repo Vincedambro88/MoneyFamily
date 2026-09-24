@@ -71,6 +71,7 @@ class MainActivity:ComponentActivity(){
  var add by remember{mutableStateOf(false)}
  var isPremium by remember{mutableStateOf(false)}
  var premiumSetupRequired by remember{mutableStateOf(false)}
+ fun refresh(){scope.launch{data=repo.all().map{it.ui()};types=repo.allTypes();cats=repo.allCategories();members=repo.allMembers();links=repo.allMappings()}}
  val premiumBilling=remember {
     PremiumBilling(
         c,
@@ -85,14 +86,13 @@ class MainActivity:ComponentActivity(){
                     isPremium = supabaseRepo.isPremiumForCurrentAccount()
                     if (isPremium) cloudSync.sync().onSuccess { refresh() }
                 } else {
-                    isPremium = premiumBilling.isPremium()
+                    isPremium = true
                 }
             }
         },
         onPurchaseDetected = { premiumSetupRequired = true }
     )
 }
- fun refresh(){scope.launch{data=repo.all().map{it.ui()};types=repo.allTypes();cats=repo.allCategories();members=repo.allMembers();links=repo.allMappings()}}
  LaunchedEffect(Unit, authRefreshVersion){premiumSetupRequired=premiumBilling.isPremiumSetupRequired();premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{isPremium=supabaseRepo.isPremiumForCurrentAccount();if(isPremium) cloudSync.sync().onSuccess{refresh()}}}else{isPremium=premiumBilling.isPremium()}}
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
  fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh();if(SupabaseClientProvider.isConfigured && isPremium)cloudSync.sync().onSuccess{refresh()}}}
