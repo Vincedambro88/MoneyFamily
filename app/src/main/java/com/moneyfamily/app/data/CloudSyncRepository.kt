@@ -10,7 +10,8 @@ import java.util.UUID
 
 class CloudSyncRepository(
     private val room: RoomRepository,
-    private val supabase: SupabaseRepository = SupabaseRepository()
+    private val supabase: SupabaseRepository = SupabaseRepository(),
+    private val budgetStore: BudgetStore? = null
 ) {
     suspend fun sync(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
@@ -19,6 +20,7 @@ class CloudSyncRepository(
                 ?: supabase.createFamily("La mia famiglia")
             syncReferenceData(familyId)
             syncOperations(familyId)
+            syncBudgets(familyId)
         }
     }
 
@@ -259,6 +261,54 @@ class CloudSyncRepository(
         }
     }
 
+    private suspend fun syncBudgets(familyId: String) {
+        val store = budgetStore ?: return
+        val localBudgets = store.all()
+        val remoteTypes = supabase.client.from("typologies").select {
+            filter { eq("family_id", familyId) }
+        }.decodeList<CloudTypologyDto>()
+        val typeByName = remoteTypes.associateBy { it.name.lowercase() }
+
+        // Push local budgets using deterministic IDs so each account/month/type has one row.
+        localBudgets.forEach { (monthKey, entries) ->
+            val parts = monthKey.split("-")
+            if (parts.size != 2) return@forEach
+            val year = parts[0].toIntOrNull() ?: return@forEach
+            val month = parts[1].toIntOrNull() ?: return@forEach
+            entries.forEach { (typeName, amount) ->
+                val remoteType = typeByName[typeName.lowercase()] ?: return@forEach
+                val id = UUID.nameUUIDFromBytes(
+                    (familyId + ":budget:" + monthKey + ":" + typeName.lowercase()).toByteArray()
+                ).toString()
+                supabase.client.from("budgets").upsert(
+                    CloudBudgetDto(
+                        id = id,
+                        familyId = familyId,
+                        typologyId = remoteType.id,
+                        categoryId = null,
+                        year = year,
+                        month = month,
+                        amount = amount,
+                        createdBy = supabase.currentUserId(),
+                        updatedAt = java.time.Instant.now().toString()
+                    )
+                )
+            }
+        }
+
+        // Import budgets created/updated on another device.
+        val remoteBudgets = supabase.client.from("budgets").select {
+            filter { eq("family_id", familyId) }
+        }.decodeList<CloudBudgetDto>()
+        val merged = localBudgets.toMutableMap().mapValues { it.value.toMutableMap() }.toMutableMap()
+        remoteBudgets.forEach { remote ->
+            val typeName = remoteTypes.firstOrNull { it.id == remote.typologyId }?.name ?: return@forEach
+            val key = "%04d-%02d".format(remote.year, remote.month)
+            merged.getOrPut(key) { mutableMapOf() }[typeName] = remote.amount
+        }
+        store.replaceAll(merged.mapValues { it.value.toMap() })
+    }
+
     private fun String.isAfterTimestamp(other: String): Boolean =
         runCatching { java.time.Instant.parse(this).isAfter(java.time.Instant.parse(other)) }
             .getOrElse { this > other }
@@ -307,6 +357,19 @@ private data class CloudTypeCategoryLinkDto(
     @SerialName("family_id") val familyId: String,
     @SerialName("typology_id") val typologyId: String,
     @SerialName("category_id") val categoryId: String
+)
+
+@Serializable
+private data class CloudBudgetDto(
+    val id: String,
+    @SerialName("family_id") val familyId: String,
+    @SerialName("typology_id") val typologyId: String? = null,
+    @SerialName("category_id") val categoryId: String? = null,
+    val year: Int,
+    val month: Int,
+    val amount: Double,
+    @SerialName("created_by") val createdBy: String? = null,
+    @SerialName("updated_at") val updatedAt: String
 )
 
 @Serializable
