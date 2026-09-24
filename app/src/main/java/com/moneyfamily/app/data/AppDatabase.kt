@@ -12,7 +12,7 @@ import androidx.room.RoomDatabase
         TypeCategoryEntity::class,
         OperationTombstone::class
     ],
-    version = 7,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
