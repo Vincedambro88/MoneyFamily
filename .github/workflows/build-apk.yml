@@ -86,7 +86,12 @@ jobs:
           exit "$status"
 
       - name: Upload build log on failure
-        if: failure()\n        uses: actions/upload-artifact@v4\n        with:\n          name: MoneyFamily-build-log\n          path: ${{ runner.temp }}/build.log\n          if-no-files-found: warn
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoneyFamily-build-log
+          path: ${{ runner.temp }}/build.log
+          if-no-files-found: warn
 
       - name: Verify AAB
         run: |
