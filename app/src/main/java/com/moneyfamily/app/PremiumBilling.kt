@@ -50,7 +50,6 @@ class PremiumBilling(
 
     fun isPremium(): Boolean = prefs.getBoolean("premium", false) || (BuildConfig.INTERNAL_PREMIUM_TEST && prefs.getBoolean("internal_test_premium", false))
 
-    /** Enables Premium only in the dedicated internal-test build. */
     fun enableInternalTestPremium() {
         if (!BuildConfig.INTERNAL_PREMIUM_TEST) return
         prefs.edit().putBoolean("internal_test_premium", true).putBoolean("premium", true).apply()
@@ -80,8 +79,7 @@ class PremiumBilling(
         return true
     }
 
-    fun price(): String? =
-        productDetails?.oneTimePurchaseOfferDetails?.formattedPrice
+    fun price(): String? = productDetails?.oneTimePurchaseOfferDetails?.formattedPrice
 
     fun close() {
         billingClient.endConnection()
@@ -95,9 +93,9 @@ class PremiumBilling(
             .build()
         billingClient.queryProductDetailsAsync(
             QueryProductDetailsParams.newBuilder().setProductList(listOf(product)).build()
-        ) { result, details ->
+        ) { result, detailsResult ->
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                productDetails = if (details.isNotEmpty()) details[0] else null
+                productDetails = detailsResult.productDetailsList.firstOrNull()
             }
         }
     }
