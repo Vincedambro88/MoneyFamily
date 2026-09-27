@@ -97,7 +97,7 @@ class PremiumBilling(
             QueryProductDetailsParams.newBuilder().setProductList(listOf(product)).build()
         ) { result, details ->
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                productDetails = details.firstOrNull()
+                productDetails = if (details.isNotEmpty()) details[0] else null
             }
         }
     }
