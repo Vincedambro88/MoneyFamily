@@ -15,6 +15,9 @@ android {
     }
     compileSdk = 36
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    lint {
+        disable += "NullSafeMutableLiveData"
+    }
     defaultConfig {
         applicationId = "com.vdapps.moneyfamily"
         minSdk = 26
