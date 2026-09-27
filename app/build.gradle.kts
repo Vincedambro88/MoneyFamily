@@ -27,12 +27,11 @@ android {
         if (localPropertiesFile.exists()) {
             localPropertiesFile.inputStream().use { localProperties.load(it) }
         }
-        buildConfigField("String", "SUPABASE_URL", "\"" + localProperties.getProperty("SUPABASE_URL", "https://ncwvcrgxifjdagnkyjeb.supabase.co") + "\"")
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_0kZN7saf26kRyqczbKbylA_hy0ehPT2") + "\"")
+        buildConfigField("String", "SUPABASE_URL", "\""+ localProperties.getProperty("SUPABASE_URL", "https://ncwvcrgxifjdagnkyjeb.supabase.co") + "\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\""+ localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_0kZN7saf26kRyqczbKbylA_hy0ehPT2") + "\"")
         val internalPremiumTest = providers.gradleProperty("internalPremiumTest").map { it.toBoolean() }.orElse(false).get()
         buildConfigField("Boolean", "INTERNAL_PREMIUM_TEST", internalPremiumTest.toString())
     }
-
 
     signingConfigs {
         create("release") {
@@ -63,9 +62,9 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-runtime:2.7.2")
+    implementation("androidx.room:room-ktx:2.7.2")
+    ksp("androidx.room:room-compiler:2.7.2")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("com.android.billingclient:billing-ktx:8.3.0")
     implementation(platform("io.github.jan-tennert.supabase:bom:3.1.4"))
