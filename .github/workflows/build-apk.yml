@@ -3,6 +3,7 @@ name: Build MoneyFamily AAB + APK
 # Main release build validation
 # Release rebuild checkpoint
 # Release 1.2.4 build trigger
+# Temporary PR trigger for release AAB validation
 
 on:
   workflow_dispatch:
