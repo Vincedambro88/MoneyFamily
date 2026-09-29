@@ -2,6 +2,7 @@ name: Build MoneyFamily AAB + APK
 # CI validation for Supabase multi-device release
 # Main release build validation
 # Release rebuild checkpoint
+# Release 1.2.4 build trigger
 
 on:
   workflow_dispatch:
