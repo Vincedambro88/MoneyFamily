@@ -93,10 +93,12 @@ class MainActivity:ComponentActivity(){
         },
         onPurchaseDetected = {
             premiumSetupRequired = true
-            // After Google Play confirms the purchase, always open the Premium
-            // section so the user can immediately create/sign in to the MoneyFamily
-            // Cloud account required to associate the purchase.
             tab = 5
+        },
+        onVerificationError = { message ->
+            premiumSetupRequired = true
+            tab = 5
+            scope.launch { /* UI error is surfaced by PremiumSection on next verification */ }
         }
     )
 }
