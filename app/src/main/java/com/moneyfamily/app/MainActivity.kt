@@ -600,7 +600,7 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
  var secondYear by remember{mutableStateOf(month.get(Calendar.YEAR)-1)}
 
  fun key(x:UiMovement)=if(dimension=="Tipologia")x.typeName.ifBlank{"Da classificare"} else x.category.ifBlank{"Non classificata"}
- fun actual(items:List<UiMovement>)=items.groupBy(::key).mapValues{(_,v)->-v.sumOf{it.amount}}
+ fun actual(items:List<UiMovement>)=items.groupBy(::key).mapValues{(_,v)->v.sumOf{it.amount}}
  val firstItems=if(mode=="Mese")data.filter{same(it.date,firstMonth)}else data.filter{parse(it.date)?.get(Calendar.YEAR)==firstYear}
  val secondItems=if(mode=="Mese")data.filter{same(it.date,secondMonth)}else data.filter{parse(it.date)?.get(Calendar.YEAR)==secondYear}
  val first=actual(firstItems)
