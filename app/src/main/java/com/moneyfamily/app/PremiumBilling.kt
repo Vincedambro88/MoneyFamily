@@ -34,6 +34,7 @@ class PremiumBilling(
         .build()
 
     private var productDetails: ProductDetails? = null
+    private var selectedOffer: ProductDetails.OneTimePurchaseOfferDetails? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun connect() {
@@ -66,20 +67,25 @@ class PremiumBilling(
 
     fun launchPurchase(activity: Activity): Boolean {
         val product = productDetails ?: return false
-        product.oneTimePurchaseOfferDetails ?: return false
+        val offer = selectedOffer
+            ?: product.oneTimePurchaseOfferDetailsList.firstOrNull()
+            ?: return false
+
         val params = BillingFlowParams.ProductDetailsParams.newBuilder()
             .setProductDetails(product)
+            .setOfferToken(offer.offerToken)
             .build()
-        billingClient.launchBillingFlow(
+
+        val result = billingClient.launchBillingFlow(
             activity,
             BillingFlowParams.newBuilder()
                 .setProductDetailsParamsList(listOf(params))
                 .build()
         )
-        return true
+        return result.responseCode == BillingClient.BillingResponseCode.OK
     }
 
-    fun price(): String? = productDetails?.oneTimePurchaseOfferDetails?.formattedPrice
+    fun price(): String? = selectedOffer?.formattedPrice
 
     fun close() {
         billingClient.endConnection()
@@ -96,6 +102,10 @@ class PremiumBilling(
         ) { result, detailsResult ->
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
                 productDetails = detailsResult.productDetailsList.firstOrNull()
+                selectedOffer = productDetails?.oneTimePurchaseOfferDetailsList?.firstOrNull()
+            } else {
+                productDetails = null
+                selectedOffer = null
             }
         }
     }
