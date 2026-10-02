@@ -71,6 +71,7 @@ class MainActivity:ComponentActivity(){
  var add by remember{mutableStateOf(false)}
  var isPremium by remember{mutableStateOf(false)}
  var premiumSetupRequired by remember{mutableStateOf(false)}
+ var premiumVerificationError by remember{mutableStateOf<String?>(null)}
  fun refresh(){scope.launch{data=repo.all().map{it.ui()};types=repo.allTypes();cats=repo.allCategories();members=repo.allMembers();links=repo.allMappings()}}
  val premiumBilling=remember {
     PremiumBilling(
@@ -80,6 +81,7 @@ class MainActivity:ComponentActivity(){
             else supabaseRepo.verifyPremiumPurchase(token)
         },
         onPremiumChanged = {
+            premiumVerificationError = null
             premiumSetupRequired = false
             scope.launch {
                 if (SupabaseClientProvider.isConfigured) {
@@ -92,13 +94,14 @@ class MainActivity:ComponentActivity(){
             }
         },
         onPurchaseDetected = {
+            premiumVerificationError = null
             premiumSetupRequired = true
             tab = 5
         },
         onVerificationError = { message ->
+            premiumVerificationError = message
             premiumSetupRequired = true
             tab = 5
-            scope.launch { /* UI error is surfaced by PremiumSection on next verification */ }
         }
     )
 }
@@ -115,7 +118,7 @@ class MainActivity:ComponentActivity(){
   4->Icon(Icons.Outlined.AccountBalanceWallet,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF0891B2))
   else->Icon(painterResource(R.drawable.ic_premium),contentDescription=t,tint=androidx.compose.ui.graphics.Color.Unspecified)
  }
-},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh();cloudSync.sync().onSuccess { refresh() }}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()});4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium);5->PremiumSection(premiumBilling,supabaseRepo,isPremium,{v->isPremium=v;premiumSetupRequired=premiumBilling.isPremiumSetupRequired()},{scope.launch{if(SupabaseClientProvider.isConfigured){runCatching{isPremium=supabaseRepo.isPremiumForCurrentAccount()};cloudSync.sync().onSuccess { refresh() }}} },authRefreshVersion)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
+},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh();cloudSync.sync().onSuccess { refresh() }}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()});4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium);5->Column(Modifier.fillMaxSize()){premiumVerificationError?.let{msg->Text("Errore verifica Premium: $msg",color=NegativeColor,modifier=Modifier.padding(horizontal=16.dp,vertical=8.dp))};PremiumSection(premiumBilling,supabaseRepo,isPremium,{v->isPremium=v;premiumSetupRequired=premiumBilling.isPremiumSetupRequired()},{scope.launch{if(SupabaseClientProvider.isConfigured){runCatching{isPremium=supabaseRepo.isPremiumForCurrentAccount()};cloudSync.sync().onSuccess { refresh() }}} },authRefreshVersion)}}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
 }
 
 @Composable private fun Dashboard(data:List<UiMovement>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit,isPremium:Boolean){
