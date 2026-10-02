@@ -30,8 +30,14 @@ android {
         if (localPropertiesFile.exists()) {
             localPropertiesFile.inputStream().use { localProperties.load(it) }
         }
-        buildConfigField("String", "SUPABASE_URL", "\""+ localProperties.getProperty("SUPABASE_URL", "https://ncwvcrgxifjdagnkyjeb.supabase.co") + "\"")
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\""+ localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_0kZN7saf26kRyqczbKbylA_hy0ehPT2") + "\"")
+        val supabaseUrl = localProperties.getProperty("SUPABASE_URL")
+            ?.takeIf { it.isNotBlank() }
+            ?: "https://ncwvcrgxifjdagnkyjeb.supabase.co"
+        val supabasePublishableKey = localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY")
+            ?.takeIf { it.isNotBlank() }
+            ?: "sb_publishable_0kZN7saf26kRyqczbKbylA_hy0ehPT2"
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
         val internalPremiumTest = providers.gradleProperty("internalPremiumTest").map { it.toBoolean() }.orElse(false).get()
         buildConfigField("Boolean", "INTERNAL_PREMIUM_TEST", internalPremiumTest.toString())
     }
