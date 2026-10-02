@@ -13,7 +13,8 @@ class PremiumBilling(
     context: Context,
     private val verifyPurchase: suspend (String) -> Boolean,
     private val onPremiumChanged: (Boolean) -> Unit,
-    private val onPurchaseDetected: () -> Unit = {}
+    private val onPurchaseDetected: () -> Unit = {},
+    private val onVerificationError: (String) -> Unit = {}
 ) {
     companion object { const val PRODUCT_ID = "moneyfamily_premium" }
 
@@ -139,13 +140,17 @@ class PremiumBilling(
 
     private fun verifyAndSetPremium(token: String) {
         scope.launch {
-            runCatching { verifyPurchase(token) }.onSuccess { verified ->
-                if (verified) safe {
-                    prefs.edit().putBoolean("premium", true).putBoolean("premium_setup_required", false)
-                        .remove("pending_purchase_token").apply()
-                    onPremiumChanged(true)
+            runCatching { verifyPurchase(token) }
+                .onSuccess { verified ->
+                    if (verified) safe {
+                        prefs.edit().putBoolean("premium", true).putBoolean("premium_setup_required", false)
+                            .remove("pending_purchase_token").apply()
+                        onPremiumChanged(true)
+                    }
                 }
-            }
+                .onFailure { error ->
+                    safe { onVerificationError(error.message ?: "Verifica Premium non completata.") }
+                }
         }
     }
 
