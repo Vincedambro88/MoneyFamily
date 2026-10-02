@@ -90,7 +90,7 @@ class MainActivity:ComponentActivity(){
                 }
             }
         },
-        onPurchaseDetected = { premiumSetupRequired = true }
+        onPurchaseDetected = {\n            premiumSetupRequired = true\n            // After Google Play confirms the purchase, always open the Premium\n            // section so the user can immediately create/sign in to the MoneyFamily\n            // Cloud account required to associate the purchase.\n            tab = 5\n        }
     )
 }
  LaunchedEffect(Unit, authRefreshVersion){premiumSetupRequired=premiumBilling.isPremiumSetupRequired();premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{isPremium=supabaseRepo.isPremiumForCurrentAccount();if(isPremium) cloudSync.sync().onSuccess{refresh()}}}else{isPremium=premiumBilling.isPremium()}}
