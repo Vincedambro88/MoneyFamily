@@ -3,6 +3,7 @@ name: Build MoneyFamily AAB + APK
 # Main release build validation
 # Release rebuild checkpoint
 # Release 1.2.4 build trigger
+# Rebuild after Billing crash hardening
 
 on:
   workflow_dispatch:
@@ -20,27 +21,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
       - name: Set up JDK 17
         uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
           cmdline-tools-version: 15859902
           accept-android-sdk-licenses: true
-
       - name: Install required Android SDK packages
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
       - name: Prepare Supabase build configuration
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -50,7 +46,6 @@ jobs:
             echo "SUPABASE_URL=$SUPABASE_URL"
             echo "SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
           } > local.properties
-
       - name: Prepare upload keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -58,7 +53,6 @@ jobs:
           test -n "$ANDROID_KEYSTORE_BASE64" || { echo "Missing ANDROID_KEYSTORE_BASE64 secret"; exit 1; }
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload-keystore.jks"
           test -s "$RUNNER_TEMP/upload-keystore.jks"
-
       - name: Validate release signing configuration
         env:
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/upload-keystore.jks
@@ -66,8 +60,6 @@ jobs:
         run: |
           test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "Missing ANDROID_KEYSTORE_PASSWORD secret"; exit 1; }
           keytool -list -keystore "$ANDROID_KEYSTORE_FILE" -storepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null
-          echo "Keystore password validated successfully."
-
       - name: Build signed release AAB
         env:
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/upload-keystore.jks
@@ -80,12 +72,10 @@ jobs:
           fi
           test -n "$ANDROID_KEY_ALIAS" || { echo "Could not determine keystore alias. Set ANDROID_KEY_ALIAS secret."; exit 1; }
           export ANDROID_KEY_ALIAS
-          echo "Using keystore alias: $ANDROID_KEY_ALIAS"
           set +e
           gradle --no-daemon --stacktrace --console=plain bundleRelease assembleRelease 2>&1 | tee "$RUNNER_TEMP/build.log"
           status=${PIPESTATUS[0]}
           exit "$status"
-
       - name: Upload build log on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -93,14 +83,10 @@ jobs:
           name: MoneyFamily-build-log
           path: ${{ runner.temp }}/build.log
           if-no-files-found: warn
-
       - name: Verify AAB
         run: |
           test -s app/build/outputs/bundle/release/app-release.aab
-          ls -lh app/build/outputs/bundle/release/app-release.aab
           test -s app/build/outputs/apk/release/app-release.apk
-          ls -lh app/build/outputs/apk/release/app-release.apk
-
       - name: Upload AAB + APK
         uses: actions/upload-artifact@v4
         with:
@@ -109,6 +95,3 @@ jobs:
             app/build/outputs/bundle/release/app-release.aab
             app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
-
-# Validate dedicated Premium account/cloud activation flow.
-# Release validation checkpoint: Premium account + Supabase multi-device flow.
