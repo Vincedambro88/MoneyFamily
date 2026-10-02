@@ -721,7 +721,7 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
   item{Button(onClick={store.copy(monthKey(selectedMonth),monthKey(shift(selectedMonth,1)));reload()},modifier=Modifier.fillMaxWidth()){Text("Copia budget al mese successivo")}}
   item{Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
    Text("Confronto Budget / Effettivo — Tipologia",style=MaterialTheme.typography.titleLarge)
-   types.filter{it.active}.forEach{t->{
+   types.filter{it.active}.forEach{t->
     val budget=values[t.name]?:0.0
     val actual=actualByType[t.name]?:0.0
     val pct=if(budget>0)actual/budget else 0.0
