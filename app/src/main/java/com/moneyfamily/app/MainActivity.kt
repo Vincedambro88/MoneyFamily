@@ -1,3 +1,720 @@
 package com.moneyfamily.app
 
-// placeholder
+import android.app.DatePickerDialog
+import android.content.Context
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.AddCircle
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.ListAlt
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import kotlin.math.abs
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import io.github.jan.supabase.auth.handleDeeplinks
+import com.moneyfamily.app.data.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
+import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.util.*
+
+private val money = NumberFormat.getCurrencyInstance(Locale.ITALY)
+private val df = SimpleDateFormat("dd/MM/yyyy", Locale.ITALY)
+private val mf = SimpleDateFormat("MMMM yyyy", Locale.ITALIAN)
+data class UiMovement(val id:Long,val type:MovementType,val amount:Double,val category:String,val description:String,val date:String,val member:String,val typeName:String = "")
+class MainActivity:ComponentActivity(){
+ private var authRefreshVersion by mutableIntStateOf(0)
+ override fun onCreate(s:Bundle?){super.onCreate(s);runCatching { if (SupabaseClientProvider.isConfigured) SupabaseClientProvider.client.handleDeeplinks(intent) };setContent{MoneyFamilyApp(authRefreshVersion)}}
+ override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);runCatching { if (SupabaseClientProvider.isConfigured) SupabaseClientProvider.client.handleDeeplinks(intent) };authRefreshVersion++}
+}
+
+@Composable private fun MoneyFamilyApp(authRefreshVersion:Int=0){
+ val c=LocalContext.current
+ val repo=remember{RoomRepository(c)}
+ val supabaseRepo=remember{SupabaseRepository()}
+ val budgetStore=remember{BudgetStore(c)}
+ val cloudSync=remember{CloudSyncRepository(repo,supabaseRepo,budgetStore)}
+ val scope=rememberCoroutineScope()
+ var data by remember{mutableStateOf<List<UiMovement>>(emptyList())}
+ var types by remember{mutableStateOf<List<TypeEntity>>(emptyList())}
+ var cats by remember{mutableStateOf<List<CategoryEntity>>(emptyList())}
+ var members by remember{mutableStateOf<List<FamilyMemberEntity>>(emptyList())}
+ var links by remember{mutableStateOf<List<TypeCategoryEntity>>(emptyList())}
+ var tab by remember{mutableStateOf(0)}
+ var month by remember{mutableStateOf(Calendar.getInstance())}
+ var edit by remember{mutableStateOf<UiMovement?>(null)}
+ var add by remember{mutableStateOf(false)}
+ var isPremium by remember{mutableStateOf(false)}
+ var premiumSetupRequired by remember{mutableStateOf(false)}
+ fun refresh(){scope.launch{data=repo.all().map{it.ui()};types=repo.allTypes();cats=repo.allCategories();members=repo.allMembers();links=repo.allMappings()}}
+ val premiumBilling=remember {
+    PremiumBilling(
+        c,
+        verifyPurchase = { token ->
+            if (!SupabaseClientProvider.isConfigured) true
+            else supabaseRepo.verifyPremiumPurchase(token)
+        },
+        onPremiumChanged = {
+            premiumSetupRequired = false
+            scope.launch {
+                if (SupabaseClientProvider.isConfigured) {
+                    runCatching { isPremium = supabaseRepo.isPremiumForCurrentAccount() }
+                        .onFailure { isPremium = false }
+                    cloudSync.sync().onSuccess { refresh() }
+                } else {
+                    isPremium = true
+                }
+            }
+        },
+        onPurchaseDetected = {
+            premiumSetupRequired = true
+            // After Google Play confirms the purchase, always open the Premium
+            // section so the user can immediately create/sign in to the MoneyFamily
+            // Cloud account required to associate the purchase.
+            tab = 5
+        }
+    )
+}
+ LaunchedEffect(Unit, authRefreshVersion){premiumSetupRequired=premiumBilling.isPremiumSetupRequired();premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{runCatching{isPremium=supabaseRepo.isPremiumForCurrentAccount()}.onFailure{isPremium=premiumBilling.isPremium()};cloudSync.sync().onSuccess { refresh() }}}else{isPremium=premiumBilling.isPremium()}}
+ DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
+ fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh();cloudSync.sync().onSuccess { refresh() }}}
+ fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh();cloudSync.sync().onSuccess { refresh() }}}
+ MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni","Budget","Premium").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={
+ when(i){
+  0->Icon(Icons.Outlined.Dashboard,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF2563EB))
+  1->Icon(Icons.Outlined.ListAlt,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF7C3AED))
+  2->Icon(Icons.Outlined.AddCircle,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF16A34A))
+  3->Icon(Icons.Outlined.Settings,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFFEA580C))
+  4->Icon(Icons.Outlined.AccountBalanceWallet,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF0891B2))
+  else->Icon(painterResource(R.drawable.ic_premium),contentDescription=t,tint=androidx.compose.ui.graphics.Color.Unspecified)
+ }
+},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh();cloudSync.sync().onSuccess { refresh() }}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()});4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium);5->PremiumSection(premiumBilling,supabaseRepo,isPremium,{v->isPremium=v;premiumSetupRequired=premiumBilling.isPremiumSetupRequired()},{scope.launch{if(SupabaseClientProvider.isConfigured){runCatching{isPremium=supabaseRepo.isPremiumForCurrentAccount()};cloudSync.sync().onSuccess { refresh() }}} },authRefreshVersion)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
+}
+
+@Composable private fun Dashboard(data:List<UiMovement>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit,isPremium:Boolean){
+ var annualPage by remember{mutableStateOf(false)}
+ val cur=data.filter{same(it.date,month)}
+ val income=cur.filter{it.amount>0}.sumOf{it.amount}
+ val expense=cur.filter{it.amount<0}.sumOf{it.amount}
+ val balance=income+expense
+ val catTotals=cur.groupBy{it.category.ifBlank{"Non classificata"}}.mapValues{(_,v)->v.sumOf{it.amount}}.filterValues{it!=0.0}.toList().sortedBy{it.second}
+ val memberTotals=cur.groupBy{it.member.ifBlank{"Non assegnato"}}.mapValues{(_,v)->v.sumOf{it.amount}}.filterValues{it!=0.0}.toList().sortedByDescending{it.second}
+ val typeTotals=cur.groupBy{it.typeName.takeIf{name->name.isNotBlank()&&!name.equals("EXPENSE",true)&&!name.equals("INCOME",true)}?:"Da classificare"}.mapValues{(_,v)->v.sumOf{it.amount}}.filterValues{it!=0.0}.toList().sortedBy{it.second}
+ val goPrev={if(annualPage){annualPage=false}else{prev()}}
+ val goNext={if(annualPage){annualPage=false;next()}else if(month.get(Calendar.MONTH)==Calendar.DECEMBER){annualPage=true}else{next()}}
+ if(annualPage){AnnualSummaryPage(data,month,goPrev,goNext,add)}else{LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+  item{MonthBar(mf.format(month.time),goPrev,goNext)}
+  item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){MetricCard("Entrate",income,Modifier.weight(1f));MetricCard("Uscite",expense,Modifier.weight(1f));MetricCard("Saldo",balance,Modifier.weight(1f))}}
+  item{PieChartCard("Composizione mensile",listOf("Entrate" to income,"Uscite" to expense))}
+  item{BarChartCard("Totali per categoria",catTotals)}
+  item{PieChartCard("Composizione per categoria",catTotals)}
+  item{BarChartCard("Totali per componente",memberTotals)}
+  item{BarChartCard("Totali per tipologia",typeTotals)}
+  item{PieChartCard("Composizione per tipologia",typeTotals)}
+  item{Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text("Riepilogo",style=MaterialTheme.typography.titleLarge);Text("Operazioni: ${cur.size}");Text("Spese: ${money.format(expense)}",color=NegativeColor);Text("Ricavi: ${money.format(income)}",color=PositiveColor);Text("Saldo: ${money.format(balance)}",color=if(balance<0)NegativeColor else PositiveColor)}}}
+  item{DashboardComparisonCard(data,month,isPremium)}
+  item{if(month.get(Calendar.MONTH)==Calendar.DECEMBER){OutlinedButton(onClick={annualPage=true},modifier=Modifier.fillMaxWidth()){Text("Riepilogo annuale ${month.get(Calendar.YEAR)}")}}}
+  item{Button(onClick=add,modifier=Modifier.fillMaxWidth()){Text("+ Inserisci operazione")}}
+ }}
+}
+
+@Composable private fun AnnualSummaryPage(data:List<UiMovement>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit){
+ val year=month.get(Calendar.YEAR)
+ val yearly=data.filter{parse(it.date)?.get(Calendar.YEAR)==year}
+ val income=yearly.filter{it.amount>0}.sumOf{it.amount}
+ val expense=yearly.filter{it.amount<0}.sumOf{it.amount}
+ val balance=income+expense
+ val catTotals=yearly.groupBy{it.category.ifBlank{"Non classificata"}}.mapValues{(_,v)->v.sumOf{it.amount}}.filterValues{it!=0.0}.toList().sortedBy{it.second}
+ val memberTotals=yearly.groupBy{it.member.ifBlank{"Non assegnato"}}.mapValues{(_,v)->v.sumOf{it.amount}}.filterValues{it!=0.0}.toList().sortedByDescending{it.second}
+ val typeTotals=yearly.groupBy{it.typeName.takeIf{name->name.isNotBlank()&&!name.equals("EXPENSE",true)&&!name.equals("INCOME",true)}?:"Da classificare"}.mapValues{(_,v)->v.sumOf{it.amount}}.filterValues{it!=0.0}.toList().sortedBy{it.second}
+ LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+  item{MonthBar("Riepilogo $year",prev,next)}
+  item{Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text("Riepilogo esercizio $year",style=MaterialTheme.typography.titleLarge);Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){MetricCard("Entrate",income,Modifier.weight(1f));MetricCard("Uscite",expense,Modifier.weight(1f));MetricCard("Saldo",balance,Modifier.weight(1f))}}}}
+  item{AnnualSummaryCard(data,month)}
+  item{PieChartCard("Composizione esercizio $year",listOf("Entrate" to income,"Uscite" to expense))}
+  item{BarChartCard("Totali per categoria — $year",catTotals)}
+  item{PieChartCard("Composizione per categoria — $year",catTotals)}
+  item{BarChartCard("Totali per componente — $year",memberTotals)}
+  item{BarChartCard("Totali per tipologia — $year",typeTotals)}
+  item{PieChartCard("Composizione per tipologia — $year",typeTotals)}
+  item{Button(onClick=add,modifier=Modifier.fillMaxWidth()){Text("+ Inserisci operazione")}}
+ }
+}
+
+private val PositiveColor=androidx.compose.ui.graphics.Color(0xFF2E7D32)
+private val NegativeColor=androidx.compose.ui.graphics.Color(0xFFC62828)
+private val ChartColors=listOf(
+ androidx.compose.ui.graphics.Color(0xFF2563EB),
+ androidx.compose.ui.graphics.Color(0xFF7C3AED),
+ androidx.compose.ui.graphics.Color(0xFF0891B2),
+ androidx.compose.ui.graphics.Color(0xFFF59E0B),
+ androidx.compose.ui.graphics.Color(0xFF16A34A),
+ androidx.compose.ui.graphics.Color(0xFFDB2777),
+ androidx.compose.ui.graphics.Color(0xFFEA580C),
+ androidx.compose.ui.graphics.Color(0xFF4F46E5),
+ androidx.compose.ui.graphics.Color(0xFF0F766E),
+ androidx.compose.ui.graphics.Color(0xFF9333EA)
+)
+
+@Composable private fun MetricCard(title:String,value:Double,modifier:Modifier){
+ Card(modifier,shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(horizontal=14.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(title,style=MaterialTheme.typography.labelLarge);Text(money.format(value),style=MaterialTheme.typography.titleMedium,color=if(value<0)NegativeColor else PositiveColor)}}
+}
+
+@Composable private fun PieChartCard(title:String,values:List<Pair<String,Double>>){
+ val nonZero=values.filter{it.second!=0.0}
+ val total=nonZero.sumOf{abs(it.second)}
+ Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+  Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+   Text(title,style=MaterialTheme.typography.titleLarge)
+   if(total==0.0){Text("Nessun dato")}
+   else{
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+     Box(Modifier.size(158.dp),contentAlignment=Alignment.Center){
+      Canvas(Modifier.fillMaxSize().padding(7.dp)){
+       var start=0f
+       nonZero.forEachIndexed{index,entry->
+        val sweep=(abs(entry.second)/total*360.0).toFloat()
+        drawArc(color=ChartColors[index%ChartColors.size],startAngle=start,sweepAngle=sweep,useCenter=false,style=androidx.compose.ui.graphics.drawscope.Stroke(width=42f,cap=androidx.compose.ui.graphics.StrokeCap.Butt))
+        start+=sweep
+       }
+      }
+      Column(horizontalAlignment=Alignment.CenterHorizontally){
+       Text(money.format(nonZero.sumOf{it.second}),style=MaterialTheme.typography.titleMedium)
+       Text("totale",style=MaterialTheme.typography.labelSmall)
+      }
+     }
+     Spacer(Modifier.width(16.dp))
+     Column(Modifier.weight(1f).height(170.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
+      nonZero.forEachIndexed{index,entry->
+       val color=ChartColors[index%ChartColors.size]
+       Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+        Box(Modifier.size(11.dp).clip(RoundedCornerShape(50)).background(color))
+        Column(Modifier.weight(1f)){
+         Text(entry.first,style=MaterialTheme.typography.labelLarge,maxLines=1)
+         Text(money.format(entry.second),style=MaterialTheme.typography.bodyMedium,color=if(entry.second<0)NegativeColor else PositiveColor)
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}
+
+@Composable private fun LegendRow(name:String,value:Double,color:androidx.compose.ui.graphics.Color){Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)){Box(Modifier.size(11.dp).clip(RoundedCornerShape(50)).background(color));Column{Text(name,style=MaterialTheme.typography.labelLarge);Text(money.format(value),style=MaterialTheme.typography.bodyMedium,color=color)}}}
+
+@Composable private fun BarChartCard(title:String,values:List<Pair<String,Double>>){Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){Text(title,style=MaterialTheme.typography.titleLarge);if(values.isEmpty())Text("Nessun dato per il mese")else{val maxAbs=values.maxOf{abs(it.second)}.coerceAtLeast(1.0);values.forEachIndexed{index,(n,v)->BarChartRow(n,v,maxAbs,index)}}}}}
+
+@Composable private fun BarChartRow(name:String,value:Double,maxAbs:Double,index:Int){val fraction=(abs(value)/maxAbs).toFloat().coerceIn(0f,1f);val color=ChartColors[index%ChartColors.size];Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(5.dp)){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(name,Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge);Text(money.format(value),color=color,style=MaterialTheme.typography.bodyLarge)};Box(Modifier.fillMaxWidth().height(22.dp).clip(RoundedCornerShape(11.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha=.55f))){if(fraction>0)Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().clip(RoundedCornerShape(11.dp)).background(color))}}}
+
+@Composable private fun Operations(
+ data:List<UiMovement>, types:List<TypeEntity>, cats:List<CategoryEntity>, members:List<FamilyMemberEntity>,
+ month:Calendar, prev:()->Unit, next:()->Unit, edit:(UiMovement)->Unit, remove:(UiMovement)->Unit,
+ deletePeriod:(Calendar,Boolean)->Unit
+){
+ var operationMonth by remember(month.timeInMillis){mutableStateOf(month.clone() as Calendar)}
+ val context=LocalContext.current
+ val scope=rememberCoroutineScope()
+ var annual by remember{mutableStateOf(false)}
+ var q by remember{mutableStateOf("")}
+ var confirmDelete by remember{mutableStateOf(false)}
+ var exportStatus by remember{mutableStateOf("")}
+ var type by remember{mutableStateOf("")}
+ var cat by remember{mutableStateOf("")}
+ var member by remember{mutableStateOf("")}
+ var kind by remember{mutableStateOf("")}
+
+ val year=operationMonth.get(Calendar.YEAR)
+ val base=if(annual)data.filter{parse(it.date)?.get(Calendar.YEAR)==year}else data.filter{same(it.date,operationMonth)}
+ val filtered=base.filter{
+  it.description.contains(q,true) &&
+  (type.isBlank()||it.typeName==type) &&
+  (cat.isBlank()||it.category==cat) &&
+  (member.isBlank()||it.member==member) &&
+  (kind.isBlank()||(kind=="Spese"&&it.amount<0)||(kind=="Ricavi"&&it.amount>0))
+ }.sortedByDescending{parse(it.date)?.timeInMillis?:0L}
+
+ val income=base.filter{it.amount>0}.sumOf{it.amount}
+ val expense=base.filter{it.amount<0}.sumOf{it.amount}
+ val balance=income+expense
+
+ val exportLauncher=rememberLauncherForActivityResult(
+  ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+ ){uri->
+  if(uri!=null)scope.launch{
+   runCatching{
+    ExcelExporter.write(context,uri,base)
+    exportStatus="Operazioni esportate in Excel"
+   }.onFailure{exportStatus="Errore esportazione: "+(it.message?:"operazione non riuscita")}
+  }
+ }
+
+ LazyColumn(
+  Modifier.fillMaxSize().padding(16.dp),
+  verticalArrangement=Arrangement.spacedBy(8.dp),
+  contentPadding=PaddingValues(bottom=24.dp)
+ ){
+  item{
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+    FilterChip(selected=!annual,onClick={annual=false},label={Text("Mese")},modifier=Modifier.weight(1f))
+    FilterChip(selected=annual,onClick={annual=true},label={Text("Anno")},modifier=Modifier.weight(1f))
+   }
+  }
+  item{
+   if(annual){
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={operationMonth=shift(operationMonth,-12)}){Text("‹")}
+     Text("Riepilogo $year",style=MaterialTheme.typography.titleLarge)
+     OutlinedButton(onClick={operationMonth=shift(operationMonth,12)}){Text("›")}
+    }
+   }else{
+    MonthBar(mf.format(operationMonth.time),{operationMonth=shift(operationMonth,-1)},{operationMonth=shift(operationMonth,1)})
+   }
+  }
+  item{
+   Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+     MetricCard("Entrate",income,Modifier.weight(1f))
+     MetricCard("Uscite",expense,Modifier.weight(1f))
+     MetricCard("Saldo",balance,Modifier.weight(1f))
+    }
+   }
+  }
+  item{
+   OutlinedButton(onClick={confirmDelete=true},modifier=Modifier.fillMaxWidth()){
+    Text(if(annual)"Cancella tutte le operazioni dell'anno $year" else "Cancella tutte le operazioni del periodo")
+   }
+  }
+  item{
+   OutlinedButton(onClick={exportLauncher.launch("MoneyFamily_Operazioni_${if(annual)year else mf.format(operationMonth.time)}.xlsx")},modifier=Modifier.fillMaxWidth()){
+    Text("Scarica in Excel")
+   }
+  }
+  if(exportStatus.isNotBlank()) item{Text(exportStatus,color=if(exportStatus.startsWith("Errore"))NegativeColor else PositiveColor)}
+  item{
+   OutlinedTextField(
+    value=q,onValueChange={q=it},
+    label={Text(if(annual)"Cerca tra tutte le operazioni dell'anno" else "Cerca descrizione")},
+    modifier=Modifier.fillMaxWidth(),singleLine=true
+   )
+  }
+  item{Choice("Tipologia",type.ifBlank{"Tutte"},context,listOf("Tutte")+types.map{it.name}){type=if(it=="Tutte")"" else it}}
+  item{Choice("Categoria",cat.ifBlank{"Tutte"},context,listOf("Tutte")+cats.map{it.name}){cat=if(it=="Tutte")"" else it}}
+  item{Choice("Componente",member.ifBlank{"Tutti"},context,listOf("Tutti")+members.map{it.name}){member=if(it=="Tutti")"" else it}}
+  item{Choice("Tipo",kind.ifBlank{"Tutti"},context,listOf("Tutti","Spese","Ricavi")){kind=if(it=="Tutti")"" else it}}
+  item{
+   Text(
+    if(annual)"${filtered.size} operazioni trovate nell'anno $year" else "${filtered.size} operazioni trovate nel mese",
+    style=MaterialTheme.typography.labelLarge
+   )
+  }
+  items(filtered,key={it.id}){x->
+   Card(Modifier.fillMaxWidth()){
+    Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(3.dp)){
+     Text(x.description.ifBlank{x.type.name},style=MaterialTheme.typography.titleMedium)
+     Text("${x.typeName.ifBlank{"Non classificata"}} • ${x.category} • ${x.member} • ${x.date}")
+     Text(money.format(x.amount),color=if(x.amount<0)NegativeColor else PositiveColor)
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
+      TextButton(onClick={edit(x)}){Text("Modifica")}
+      TextButton(onClick={remove(x)}){Text("Elimina")}
+     }
+    }
+   }
+  }
+ }
+ if(confirmDelete) AlertDialog(
+  onDismissRequest={confirmDelete=false},
+  title={Text(if(annual)"Cancella operazioni dell'anno" else "Cancella operazioni")},
+  text={Text(if(annual)"Vuoi eliminare tutte le operazioni del $year? Questa operazione non può essere annullata." else "Vuoi eliminare tutte le operazioni di ${mf.format(operationMonth.time)}? Questa operazione non può essere annullata.")},
+  confirmButton={TextButton(onClick={confirmDelete=false;deletePeriod(operationMonth,annual)}){Text("Cancella")}},
+  dismissButton={TextButton(onClick={confirmDelete=false}){Text("Annulla")}}
+ )
+}
+
+@Composable private fun Editor(old:UiMovement?,types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,cancel:()->Unit,save:(UiMovement)->Unit){val c=LocalContext.current;var amount by remember(old){mutableStateOf(old?.amount?.toString()?:"")};var desc by remember(old){mutableStateOf(old?.description?:"")};var date by remember(old){mutableStateOf(old?.date?:df.format(Date()))};var type by remember(old){mutableStateOf(old?.typeName?.takeIf{it.isNotBlank() && !it.equals("EXPENSE",true)}?:"")};var category by remember(old){mutableStateOf(old?.category?:"")};var member by remember(old){mutableStateOf(old?.member?:"")};LaunchedEffect(types,members,old){if(old==null){if(type.isBlank())type=types.firstOrNull()?.name?:"";if(member.isBlank())member=members.firstOrNull()?.name?:""}};LaunchedEffect(type,links,cats){if(old==null&&type.isNotBlank()){val t=types.find{it.name==type};val l=links.find{it.typeId==t?.id};if(l!=null)category=cats.find{it.id==l.categoryId}?.name?:category}};AlertDialog(onDismissRequest=cancel,title={Text(if(old==null)"Nuova operazione" else "Modifica operazione")},text={Column(verticalArrangement=Arrangement.spacedBy(7.dp)){OutlinedTextField(value=amount,onValueChange={amount=it},label={Text("Importo (+ ricavo / - spesa)")},modifier=Modifier.fillMaxWidth());Choice("Tipologia",type.ifBlank{"Seleziona"},c,types.filter{it.active}.map{it.name}){type=it};Choice("Categoria",category.ifBlank{"Seleziona"},c,cats.filter{it.active}.map{it.name}){category=it};Choice("Effettuata da",member.ifBlank{"Seleziona"},c,members.filter{it.active||it.name==old?.member}.map{it.name}){member=it};OutlinedTextField(value=desc,onValueChange={desc=it},label={Text("Descrizione")},modifier=Modifier.fillMaxWidth());OutlinedButton(onClick={val x=parse(date)?:Calendar.getInstance();DatePickerDialog(c,{_,y,m,d->x.set(y,m,d);date=df.format(x.time)},x.get(Calendar.YEAR),x.get(Calendar.MONTH),x.get(Calendar.DAY_OF_MONTH)).show()}){Text("Data $date")}}},confirmButton={TextButton(enabled=amount.replace(',','.').toDoubleOrNull()!=null&&type.isNotBlank()&&category.isNotBlank()&&member.isNotBlank(),onClick={val a=amount.replace(',','.').toDouble();save(UiMovement(old?.id?:System.currentTimeMillis(),if(a<0)MovementType.EXPENSE else MovementType.INCOME,a,category,desc,date,member,type))}){Text("Salva")}},dismissButton={TextButton(onClick=cancel){Text("Annulla")}})}
+
+
+@Composable private fun AnnualSummaryCard(data:List<UiMovement>,month:Calendar){
+ val year=month.get(Calendar.YEAR);val yearly=data.filter{parse(it.date)?.get(Calendar.YEAR)==year};val income=yearly.filter{it.amount>0}.sumOf{it.amount};val expense=yearly.filter{it.amount<0}.sumOf{it.amount};val balance=income+expense
+ val monthly=(0..11).map{m->m to yearly.filter{parse(it.date)?.get(Calendar.MONTH)==m}.sumOf{it.amount}}
+ Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){Text("Riepilogo esercizio $year",style=MaterialTheme.typography.titleLarge);Text("${yearly.size} operazioni",style=MaterialTheme.typography.labelMedium)}
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){MetricCard("Entrate",income,Modifier.weight(1f));MetricCard("Uscite",expense,Modifier.weight(1f));MetricCard("Saldo",balance,Modifier.weight(1f))}
+  Text("Totale mensile",style=MaterialTheme.typography.titleMedium);val maxAbs=monthly.maxOf{abs(it.second)}.coerceAtLeast(1.0)
+  monthly.forEach{(m,v)->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){Text(SimpleDateFormat("MMM",Locale.ITALIAN).format(Calendar.getInstance().apply{set(Calendar.DAY_OF_MONTH,1);set(Calendar.MONTH,m)}.time),Modifier.width(34.dp),style=MaterialTheme.typography.labelMedium);Box(Modifier.weight(1f).height(14.dp).clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha=.55f))){if(v!=0.0)Box(Modifier.fillMaxWidth((abs(v)/maxAbs).toFloat().coerceIn(0f,1f)).fillMaxHeight().clip(RoundedCornerShape(7.dp)).background(if(v<0)NegativeColor else PositiveColor))};Text(money.format(v),Modifier.width(92.dp),color=if(v<0)NegativeColor else PositiveColor,style=MaterialTheme.typography.labelSmall)}}
+ }}
+}
+
+@Composable private fun InsertScreen(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,onBack:()->Unit,save:(UiMovement)->Unit,onImported:()->Unit,data:List<UiMovement>){
+ val context=LocalContext.current;val scope=rememberCoroutineScope();var status by remember{mutableStateOf("")};var showEditor by remember{mutableStateOf(false)}
+ val launcher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->if(uri!=null)scope.launch{runCatching{
+  val rows=ExcelImporter.import(context,uri)
+  rows.forEachIndexed{idx,r->
+   val te=types.firstOrNull{it.name.equals(r.typeName,true)}
+   val mapped=if(r.category.isBlank())links.firstOrNull{it.typeId==te?.id}?.let{l->cats.firstOrNull{c->c.id==l.categoryId}?.name}.orEmpty() else r.category
+   repo.insert(Movement(id=System.currentTimeMillis()+idx,type=if(r.amount<0)MovementType.EXPENSE else MovementType.INCOME,amount=r.amount,category=mapped.ifBlank{cats.firstOrNull()?.name.orEmpty()},description=r.description,date=r.date,member=r.member.ifBlank{members.firstOrNull()?.name.orEmpty()},paymentMethod="",typeName=r.typeName))
+  }
+  onImported()
+  status="Importate ${rows.size} operazioni"
+ }.onFailure{status="Errore importazione: ${it.message?:"file non valido"}"}}}
+ val templateLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")){uri->if(uri!=null)scope.launch{runCatching{ExcelTemplate.write(context,uri);status="Modello Excel salvato"}.onFailure{status="Errore salvataggio: ${it.message?:"operazione non riuscita"}"}}}
+ Column(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
+  Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){TextButton(onClick=onBack){Text("← Indietro")};Spacer(Modifier.weight(1f));Text("Inserisci",style=MaterialTheme.typography.headlineSmall)}
+  Button(onClick={showEditor=true},modifier=Modifier.fillMaxWidth()){Text("+ Nuova operazione")}
+  OutlinedButton(onClick={templateLauncher.launch("MoneyFamily_Modello_Importazione.xlsx")},modifier=Modifier.fillMaxWidth()){Text("Scarica modello Excel")}
+  OutlinedButton(onClick={launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-excel","text/csv"))},modifier=Modifier.fillMaxWidth()){Text("Importa da Excel")}
+  Text("Esporta tutte le operazioni nello stesso tracciato previsto dal modello Excel.",style=MaterialTheme.typography.bodyMedium)
+  Text("Excel obbligatorio: Data | Descrizione | Importo | Tipologia | Categoria | Membro famiglia. Non inserire Entrata/Uscita: la natura dell'operazione deriva dal segno dell'Importo.",style=MaterialTheme.typography.bodyMedium)
+  if(status.isNotBlank())Text(status,color=if(status.startsWith("Errore"))NegativeColor else PositiveColor)
+ }
+ if(showEditor)Editor(null,types,cats,members,links,repo,{showEditor=false}){save(it);showEditor=false}
+}
+
+@Composable private fun Configuration(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit){
+ var section by remember{mutableStateOf(0)}
+ Column(Modifier.fillMaxSize().padding(16.dp)){
+  Text("Configurazione",style=MaterialTheme.typography.headlineSmall)
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(2.dp)){
+   listOf("Tipologie","Categorie","Famiglia","Associazioni").forEachIndexed{i,t->TextButton(onClick={section=i}){Text(t)}}
+  }
+  Box(Modifier.fillMaxWidth().weight(1f)){
+   when(section){
+    0->ConfigTypesV2(types,repo,refresh)
+    1->ConfigCatsV2(cats,repo,refresh)
+    2->ConfigMembersV2(members,repo,refresh)
+    3->ConfigLinksV2(types,cats,links,repo,refresh)
+   }
+  }
+ }
+}
+
+@Composable private fun ConfigTypesV2(items:List<TypeEntity>,repo:RoomRepository,refresh:()->Unit){
+ var name by remember{mutableStateOf("")};var edit by remember{mutableStateOf<TypeEntity?>(null)};var del by remember{mutableStateOf<TypeEntity?>(null)};val scope=rememberCoroutineScope()
+ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
+  Text("Tipologie",style=MaterialTheme.typography.titleLarge)
+  items.forEach{item->ConfigRowV2(item.name,item.active,{edit=item},{del=item})}
+  OutlinedTextField(value=name,onValueChange={name=it},label={Text("Nuova tipologia")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+  Button(onClick={val n=name.trim();if(n.isNotBlank())scope.launch{repo.addType(n);name="";refresh()}},modifier=Modifier.fillMaxWidth()){Text("+ Aggiungi tipologia")}
+ }
+ edit?.let{e->EditNameDialogV2("Modifica tipologia",e.name){n->scope.launch{repo.updateType(TypeEntity(e.id,n,true));edit=null;refresh()}}}
+ del?.let{e->ConfirmDeactivateV2(e.name){scope.launch{repo.setTypeActive(e.id,false);del=null;refresh()}}}
+}
+
+@Composable private fun ConfigCatsV2(items:List<CategoryEntity>,repo:RoomRepository,refresh:()->Unit){
+ var name by remember{mutableStateOf("")};var edit by remember{mutableStateOf<CategoryEntity?>(null)};var del by remember{mutableStateOf<CategoryEntity?>(null)};val scope=rememberCoroutineScope()
+ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
+  Text("Categorie",style=MaterialTheme.typography.titleLarge)
+  items.forEach{item->ConfigRowV2(item.name,item.active,{edit=item},{del=item})}
+  OutlinedTextField(value=name,onValueChange={name=it},label={Text("Nuova categoria")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+  Button(onClick={val n=name.trim();if(n.isNotBlank())scope.launch{repo.addCategory(n);name="";refresh()}},modifier=Modifier.fillMaxWidth()){Text("+ Aggiungi categoria")}
+ }
+ edit?.let{e->EditNameDialogV2("Modifica categoria",e.name){n->scope.launch{repo.updateCategory(CategoryEntity(e.id,n,true));edit=null;refresh()}}}
+ del?.let{e->ConfirmDeactivateV2(e.name){scope.launch{repo.setCategoryActive(e.id,false);del=null;refresh()}}}
+}
+
+@Composable private fun ConfigMembersV2(items:List<FamilyMemberEntity>,repo:RoomRepository,refresh:()->Unit){
+ var name by remember{mutableStateOf("")};var edit by remember{mutableStateOf<FamilyMemberEntity?>(null)};var del by remember{mutableStateOf<FamilyMemberEntity?>(null)};val scope=rememberCoroutineScope()
+ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
+  Text("Membri della famiglia",style=MaterialTheme.typography.titleLarge)
+  items.forEach{item->ConfigRowV2(item.name,item.active,{edit=item},{del=item})}
+  OutlinedTextField(value=name,onValueChange={name=it},label={Text("Nuovo membro")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+  Button(onClick={val n=name.trim();if(n.isNotBlank())scope.launch{repo.addMember(n);name="";refresh()}},modifier=Modifier.fillMaxWidth()){Text("+ Aggiungi membro")}
+ }
+ edit?.let{e->EditNameDialogV2("Modifica membro",e.name){n->scope.launch{repo.updateMember(FamilyMemberEntity(e.id,n,true));edit=null;refresh()}}}
+ del?.let{e->ConfirmDeactivateV2(e.name){scope.launch{repo.setMemberActive(e.id,false);del=null;refresh()}}}
+}
+
+@Composable private fun ConfigRowV2(name:String,active:Boolean,onEdit:()->Unit,onDelete:()->Unit){
+ Row(Modifier.fillMaxWidth().padding(vertical=2.dp),verticalAlignment=Alignment.CenterVertically){
+  Column(Modifier.weight(1f)){Text(name);if(!active)Text("Disattivato",style=MaterialTheme.typography.labelSmall)}
+  TextButton(onClick=onEdit){Text("✏")}
+  TextButton(onClick=onDelete){Text(if(active)"✕" else "↻")}
+ }
+}
+
+@Composable private fun ConfigLinksV2(types:List<TypeEntity>,cats:List<CategoryEntity>,links:List<TypeCategoryEntity>,repo:RoomRepository,refresh:()->Unit){
+ val c=LocalContext.current;val scope=rememberCoroutineScope()
+ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
+  Text("Associazioni tipologia → categoria",style=MaterialTheme.typography.titleLarge)
+  Text("Tocca la categoria per modificarla.",style=MaterialTheme.typography.bodyMedium)
+  types.filter{it.active}.forEach{t->
+   val currentId=links.find{it.typeId==t.id}?.categoryId
+   val current=cats.find{it.id==currentId}
+   Card(Modifier.fillMaxWidth()){
+    Row(Modifier.fillMaxWidth().padding(horizontal=10.dp,vertical=4.dp),verticalAlignment=Alignment.CenterVertically){
+     Text(t.name,Modifier.weight(1f))
+     TextButton(onClick={ChoiceDialog(c,"Categoria per ${t.name}",cats.filter{it.active}.map{it.name}){n->cats.find{it.name==n}?.let{cat->scope.launch{repo.setTypeCategory(t.id,cat.id);refresh()}}}}){Text(current?.name?:"Non associata")}
+    }
+   }
+  }
+ }
+}
+
+@Composable private fun EditNameDialogV2(title:String,current:String,onSave:(String)->Unit){
+ var value by remember(current){mutableStateOf(current)}
+ var open by remember{mutableStateOf(true)}
+ if(open) AlertDialog(onDismissRequest={open=false},title={Text(title)},text={OutlinedTextField(value=value,onValueChange={value=it},singleLine=true,label={Text("Nome")})},confirmButton={TextButton(onClick={val n=value.trim();if(n.isNotBlank()){open=false;onSave(n)}}){Text("Salva")}},dismissButton={TextButton(onClick={open=false}){Text("Annulla")}})
+}
+
+@Composable private fun ConfirmDeactivateV2(name:String,onConfirm:()->Unit){
+ var open by remember{mutableStateOf(true)}
+ if(open) AlertDialog(onDismissRequest={open=false},title={Text("Elimina valore")},text={Text("Vuoi eliminare/disattivare \"$name\"? Le operazioni storiche non verranno cancellate.")},confirmButton={TextButton(onClick={open=false;onConfirm()}){Text("Elimina")}},dismissButton={TextButton(onClick={open=false}){Text("Annulla")}})
+}
+
+private fun ChoiceDialog(c:Context,title:String,opts:List<String>,pick:(String)->Unit){android.app.AlertDialog.Builder(c).setTitle(title).setItems(opts.toTypedArray()){_,i->pick(opts[i])}.show()}
+@Composable private fun Choice(label:String,value:String,c:Context,opts:List<String>,pick:(String)->Unit){OutlinedButton(onClick={ChoiceDialog(c,label,opts,pick)},modifier=Modifier.fillMaxWidth()){Text("$label: $value")}}
+@Composable private fun MonthBar(label:String,prev:()->Unit,next:()->Unit){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){OutlinedButton(onClick=prev){Text("‹")};Text(label,Modifier.padding(top=10.dp));OutlinedButton(onClick=next){Text("›")}}}
+private fun shift(c:Calendar,d:Int)=(c.clone() as Calendar).apply{add(Calendar.MONTH,d)}
+fun parse(s:String)=runCatching{df.parse(s)?.let{Calendar.getInstance().apply{time=it}}}.getOrNull()
+private fun same(s:String,c:Calendar):Boolean{val d=parse(s)?:return false;return d.get(Calendar.YEAR)==c.get(Calendar.YEAR)&&d.get(Calendar.MONTH)==c.get(Calendar.MONTH)}
+private fun Movement.ui()=UiMovement(id,type,amount,category,description,date,member,typeName)
+private fun UiMovement.model()=Movement(id,type,amount,category,description,date,member,"",typeName)
+
+@Composable private fun MasterDataCrud(types:List<TypeEntity>,cats:List<CategoryEntity>,members:List<FamilyMemberEntity>,repo:RoomRepository,refresh:()->Unit){
+ var dialogKind by remember{mutableStateOf("")};var editId by remember{mutableStateOf(0L)};var editName by remember{mutableStateOf("")}
+ var deleteKind by remember{mutableStateOf("")};var deleteId by remember{mutableStateOf(0L)};var deleteName by remember{mutableStateOf("")}
+ val scope=rememberCoroutineScope()
+ fun openEdit(k:String,id:Long,n:String){dialogKind=k;editId=id;editName=n}
+ fun askDelete(k:String,id:Long,n:String){deleteKind=k;deleteId=id;deleteName=n}
+ Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)){
+  Text("Gestione anagrafiche",style=MaterialTheme.typography.headlineSmall)
+  Text("Modifica o disattiva tipologie, categorie e membri. Le operazioni storiche non vengono cancellate.",style=MaterialTheme.typography.bodyMedium)
+  MasterDataSection("Tipologie",types.map{Triple(it.id,it.name,it.active)},{openEdit("TYPE",it.first,it.second)},{askDelete("TYPE",it.first,it.second)})
+  MasterDataSection("Categorie",cats.map{Triple(it.id,it.name,it.active)},{openEdit("CATEGORY",it.first,it.second)},{askDelete("CATEGORY",it.first,it.second)})
+  MasterDataSection("Membri della famiglia",members.map{Triple(it.id,it.name,it.active)},{openEdit("MEMBER",it.first,it.second)},{askDelete("MEMBER",it.first,it.second)})
+ }
+ if(dialogKind.isNotBlank()) AlertDialog(onDismissRequest={dialogKind=""},title={Text("Modifica valore")},text={OutlinedTextField(value=editName,onValueChange={editName=it},label={Text("Nome")},singleLine=true)},confirmButton={TextButton(onClick={val n=editName.trim();if(n.isNotBlank())scope.launch{when(dialogKind){"TYPE"->repo.updateType(TypeEntity(editId,n,true));"CATEGORY"->repo.updateCategory(CategoryEntity(editId,n,true));"MEMBER"->repo.updateMember(FamilyMemberEntity(editId,n,true))};dialogKind="";refresh()}}){Text("Salva")}},dismissButton={TextButton(onClick={dialogKind=""}){Text("Annulla")}})
+ if(deleteKind.isNotBlank()) AlertDialog(onDismissRequest={deleteKind=""},title={Text("Disattiva valore")},text={Text("Vuoi disattivare \"$deleteName\"? Le operazioni storiche resteranno disponibili, ma il valore non sarà più proposto nei nuovi inserimenti.")},confirmButton={TextButton(onClick={scope.launch{when(deleteKind){"TYPE"->repo.setTypeActive(deleteId,false);"CATEGORY"->repo.setCategoryActive(deleteId,false);"MEMBER"->repo.setMemberActive(deleteId,false)};deleteKind="";refresh()}}){Text("Disattiva")}},dismissButton={TextButton(onClick={deleteKind=""}){Text("Annulla")}})
+}
+
+@Composable private fun MasterDataSection(title:String,items:List<Triple<Long,String,Boolean>>,onEdit:(Triple<Long,String,Boolean>)->Unit,onDelete:(Triple<Long,String,Boolean>)->Unit){
+ Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp)){Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+  Text(title,style=MaterialTheme.typography.titleLarge)
+  if(items.isEmpty())Text("Nessun valore")
+  items.forEach{item->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(item.second);if(!item.third)Text("Disattivato",style=MaterialTheme.typography.labelSmall)};TextButton(onClick={onEdit(item)}){Text("✏")};TextButton(onClick={onDelete(item)}){Text(if(item.third)"🗑" else "↻")}}}
+ }}
+}
+
+
+@Composable private fun CloudAccountCard(repo:SupabaseRepository,isPremium:Boolean){
+ val scope=rememberCoroutineScope()
+ var email by remember{mutableStateOf<String?>(null)}
+ var familyName by remember{mutableStateOf<String?>(null)}
+ var familyId by remember{mutableStateOf<String?>(null)}
+ var members by remember{mutableStateOf<List<SupabaseFamilyMemberDto>>(emptyList())}
+ var busy by remember{mutableStateOf(false)}
+ var error by remember{mutableStateOf<String?>(null)}
+ var mode by remember{mutableStateOf("login")}
+ var inputEmail by remember{mutableStateOf("")}
+ var password by remember{mutableStateOf("")}
+ var familyInput by remember{mutableStateOf("")}
+ var showCreateFamily by remember{mutableStateOf(false)}
+ var refresh by remember{mutableStateOf(0)}
+ fun load(){
+  scope.launch{busy=true;error=null;runCatching{email=repo.currentUserEmail();val families=repo.familiesForCurrentUser();val family=families.firstOrNull();familyId=family?.id;familyName=family?.name;members=family?.let{repo.familyMembers(it.id)}?:emptyList()}.onFailure{error=it.message?:"Errore di connessione"};busy=false}
+ }
+ LaunchedEffect(refresh){if(SupabaseClientProvider.isConfigured)load()}
+ Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+  Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("Account e famiglia",style=MaterialTheme.typography.titleLarge)
+   if(!SupabaseClientProvider.isConfigured){Text("Cloud non configurato su questo dispositivo. Funzionamento locale invariato.")}
+   else if(email==null){
+    Text("Accedi allo stesso account su più dispositivi per condividere la stessa famiglia.")
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){FilterChip(selected=mode=="login",onClick={mode="login"},label={Text("Accedi")},modifier=Modifier.weight(1f));FilterChip(selected=mode=="signup",onClick={mode="signup"},label={Text("Registrati")},modifier=Modifier.weight(1f))}
+    OutlinedTextField(value=inputEmail,onValueChange={inputEmail=it},label={Text("Email")},singleLine=true,modifier=Modifier.fillMaxWidth())
+    OutlinedTextField(value=password,onValueChange={password=it},label={Text("Password")},singleLine=true,modifier=Modifier.fillMaxWidth())
+    Button(enabled=!busy&&inputEmail.isNotBlank()&&password.length>=6,onClick={scope.launch{busy=true;error=null;runCatching{if(mode=="login")repo.signIn(inputEmail,password)else repo.signUp(inputEmail,password);inputEmail="";password=""}.onFailure{error=it.message?:"Operazione non riuscita"};busy=false;refresh++}},modifier=Modifier.fillMaxWidth()){Text(if(busy)"Attendere…"else if(mode=="login")"Accedi"else"Crea account")}
+   }else{
+    Text("Account: "+email,style=MaterialTheme.typography.bodyLarge)
+    if(familyId==null){
+     Text("Nessuna famiglia associata a questo account.")
+     if(showCreateFamily){OutlinedTextField(value=familyInput,onValueChange={familyInput=it},label={Text("Nome famiglia")},singleLine=true,modifier=Modifier.fillMaxWidth());Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton(onClick={showCreateFamily=false},modifier=Modifier.weight(1f)){Text("Annulla")};Button(enabled=!busy&&familyInput.isNotBlank(),onClick={scope.launch{busy=true;error=null;runCatching{repo.createFamily(familyInput)}.onSuccess{familyInput="";showCreateFamily=false}.onFailure{error=it.message?:"Creazione famiglia non riuscita"};busy=false;refresh++}},modifier=Modifier.weight(1f)){Text("Crea")}}}else Button(onClick={showCreateFamily=true},modifier=Modifier.fillMaxWidth()){Text("+ Crea famiglia")}
+    }else{Text("Famiglia: "+(familyName?:""),style=MaterialTheme.typography.bodyLarge);Text("Membri: "+members.size);members.forEach{Text("• "+it.displayName+" ("+it.role+")",style=MaterialTheme.typography.bodyMedium)};if(isPremium)Text("Premium: condiviso a livello famiglia",color=PositiveColor,style=MaterialTheme.typography.labelLarge);Text("Usa lo stesso account sugli altri dispositivi per accedere agli stessi dati della famiglia.",style=MaterialTheme.typography.bodySmall)}
+    OutlinedButton(onClick={scope.launch{try{repo.signOutCurrentDevice();refresh++}catch(t:Throwable){error=t.message}}},modifier=Modifier.fillMaxWidth()){Text("Esci da questo dispositivo")}
+   }
+   error?.let{Text(it,color=NegativeColor,style=MaterialTheme.typography.bodySmall)}
+  }
+ }
+}
+@Composable private fun PremiumCard(billing:PremiumBilling,isPremium:Boolean){
+ val context=LocalContext.current
+ Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+  Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+    Text("MoneyFamily Premium",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f))
+    Text(if(isPremium)"ATTIVO" else "PREMIUM",style=MaterialTheme.typography.labelLarge,color=if(isPremium)PositiveColor else MaterialTheme.colorScheme.primary)
+   }
+   Text(if(isPremium)"Budget, analisi avanzate e sincronizzazione sono sbloccati." else "Sblocca Budget, confronto mese/anno, warning e funzioni cloud.",style=MaterialTheme.typography.bodyMedium)
+   if(!isPremium){
+    val price=billing.price()
+    Button(onClick={val activity=context as? android.app.Activity;if(activity!=null)billing.launchPurchase(activity)},modifier=Modifier.fillMaxWidth()){
+     Text(if(price!=null)"Acquista Premium · $price" else "Acquista Premium")
+    }
+    if(price==null)Text("Il prodotto Premium deve essere configurato su Google Play per rendere disponibile l'acquisto.",style=MaterialTheme.typography.labelSmall)
+   }
+  }
+ }
+}
+
+@Composable private fun DashboardComparisonCard(data:List<UiMovement>,month:Calendar,isPremium:Boolean){
+ if(!isPremium){
+  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+   Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Confronto costi effettivi",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));Text("PREMIUM",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)}
+    Text("Confronta due mesi specifici oppure due anni, per tipologia o categoria.",style=MaterialTheme.typography.bodyMedium)
+   }
+  }
+  return
+ }
+ var mode by remember{mutableStateOf("Mese")}
+ var dimension by remember{mutableStateOf("Tipologia")}
+ var firstMonth by remember{mutableStateOf(month.clone() as Calendar)}
+ var secondMonth by remember{mutableStateOf(shift(month,-1))}
+ var firstYear by remember{mutableStateOf(month.get(Calendar.YEAR))}
+ var secondYear by remember{mutableStateOf(month.get(Calendar.YEAR)-1)}
+
+ fun key(x:UiMovement)=if(dimension=="Tipologia")x.typeName.ifBlank{"Da classificare"} else x.category.ifBlank{"Non classificata"}
+ fun actual(items:List<UiMovement>)=items.groupBy(::key).mapValues{(_,v)->-v.sumOf{it.amount}}
+ val firstItems=if(mode=="Mese")data.filter{same(it.date,firstMonth)}else data.filter{parse(it.date)?.get(Calendar.YEAR)==firstYear}
+ val secondItems=if(mode=="Mese")data.filter{same(it.date,secondMonth)}else data.filter{parse(it.date)?.get(Calendar.YEAR)==secondYear}
+ val first=actual(firstItems)
+ val second=actual(secondItems)
+ val keys=(first.keys+second.keys).distinct().sorted()
+ val firstLabel=if(mode=="Mese")mf.format(firstMonth.time) else firstYear.toString()
+ val secondLabel=if(mode=="Mese")mf.format(secondMonth.time) else secondYear.toString()
+
+ Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
+  Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+   Text("Confronto costi effettivi",style=MaterialTheme.typography.titleLarge)
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+    FilterChip(selected=mode=="Mese",onClick={mode="Mese"},label={Text("Mese / Mese")},modifier=Modifier.weight(1f))
+    FilterChip(selected=mode=="Anno",onClick={mode="Anno"},label={Text("Anno / Anno")},modifier=Modifier.weight(1f))
+   }
+   Text("Raggruppa il confronto per:",style=MaterialTheme.typography.labelLarge)
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+    FilterChip(selected=dimension=="Tipologia",onClick={dimension="Tipologia"},label={Text("TIPOLOGIA")},modifier=Modifier.weight(1f))
+    FilterChip(selected=dimension=="Categoria",onClick={dimension="Categoria"},label={Text("CATEGORIA")},modifier=Modifier.weight(1f))
+   }
+   Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){
+    Text(
+     if(dimension=="Tipologia")"Visualizzazione attiva: solo TIPOLOGIE" else "Visualizzazione attiva: solo CATEGORIE",
+     modifier=Modifier.padding(horizontal=12.dp,vertical=8.dp),
+     style=MaterialTheme.typography.labelLarge
+    )
+   }
+   if(mode=="Mese"){
+    Text("Periodo 1",style=MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={firstMonth=shift(firstMonth,-1)},modifier=Modifier.weight(1f)){Text("‹")}
+     Text(firstLabel,modifier=Modifier.weight(3f),style=MaterialTheme.typography.bodyLarge)
+     OutlinedButton(onClick={firstMonth=shift(firstMonth,1)},modifier=Modifier.weight(1f)){Text("›")}
+    }
+    Text("Periodo 2",style=MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={secondMonth=shift(secondMonth,-1)},modifier=Modifier.weight(1f)){Text("‹")}
+     Text(secondLabel,modifier=Modifier.weight(3f),style=MaterialTheme.typography.bodyLarge)
+     OutlinedButton(onClick={secondMonth=shift(secondMonth,1)},modifier=Modifier.weight(1f)){Text("›")}
+    }
+   }else{
+    Text("Periodo 1",style=MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={firstYear-=1},modifier=Modifier.weight(1f)){Text("‹")}
+     Text(firstYear.toString(),modifier=Modifier.weight(3f),style=MaterialTheme.typography.bodyLarge)
+     OutlinedButton(onClick={firstYear+=1},modifier=Modifier.weight(1f)){Text("›")}
+    }
+    Text("Periodo 2",style=MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+     OutlinedButton(onClick={secondYear-=1},modifier=Modifier.weight(1f)){Text("‹")}
+     Text(secondYear.toString(),modifier=Modifier.weight(3f),style=MaterialTheme.typography.bodyLarge)
+     OutlinedButton(onClick={secondYear+=1},modifier=Modifier.weight(1f)){Text("›")}
+    }
+   }
+   Text("${firstLabel} vs ${secondLabel}",style=MaterialTheme.typography.labelLarge)
+   if(keys.isEmpty()) Text("Nessun costo disponibile.")
+   else keys.forEach{label->
+    val a=first[label]?:0.0
+    val b=second[label]?:0.0
+    val delta=a-b
+    val pct=if(b!=0.0)delta/b*100.0 else null
+    Column(verticalArrangement=Arrangement.spacedBy(3.dp)){
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
+      Text(label,modifier=Modifier.weight(1f))
+      Text(money.format(a))
+     }
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
+      Text("${secondLabel}: ${money.format(b)}",style=MaterialTheme.typography.labelSmall)
+      Text("Δ ${money.format(delta)}"+(pct?.let{" · ${String.format(Locale.ITALY,"%.1f%%",it)}"}?:""),color=if(delta>0)NegativeColor else if(delta<0)PositiveColor else MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.labelSmall)
+     }
+    }
+   }
+  }
+ }
+}
+
+@Composable private fun BudgetScreen(types:List<TypeEntity>,cats:List<CategoryEntity>,links:List<TypeCategoryEntity>,data:List<UiMovement>,month:Calendar,billing:PremiumBilling,isPremium:Boolean){
+ val context=LocalContext.current
+ if(!isPremium){
+  LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+   item{Text("Budget",style=MaterialTheme.typography.headlineSmall)}
+   item{PremiumCard(billing,isPremium)}
+  }
+  return
+ }
+ val store=remember{BudgetStore(context)}
+ var selectedMonth by remember{mutableStateOf(month.clone() as Calendar)}
+ var values by remember{mutableStateOf<Map<String,Double>>(emptyMap())}
+ var budgetInputs by remember{mutableStateOf<Map<String,String>>(emptyMap())}
+ fun reload(){
+  val loaded=store.get(monthKey(selectedMonth))
+  values=loaded
+  budgetInputs=types.filter{it.active}.associate{it.name to if(loaded[it.name]==null||loaded[it.name]==0.0)"" else loaded[it.name]!!.toString()}
+ }
+ LaunchedEffect(selectedMonth.timeInMillis,types){reload()}
+ val actualByType=data.filter{same(it.date,selectedMonth)}.groupBy{it.typeName}.mapValues{(_,v)->-v.sumOf{it.amount}}
+ val actualByCategory=data.filter{same(it.date,selectedMonth)}.groupBy{it.category.ifBlank{"Non classificata"}}.mapValues{(_,v)->-v.sumOf{it.amount}}
+ LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+  item{Text("Budget",style=MaterialTheme.typography.headlineSmall)}
+  item{MonthBar(mf.format(selectedMonth.time),{selectedMonth=shift(selectedMonth,-1)},{selectedMonth=shift(selectedMonth,1)})}
+  item{Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("Budget mensile per tipologia",style=MaterialTheme.typography.titleLarge)
+   types.filter{it.active}.forEach{t->
+    val budget=values[t.name]?:0.0;val actual=actualByType[t.name]?:0.0;val pct=if(budget>0)actual/budget else 0.0
+    OutlinedTextField(
+     value=budgetInputs[t.name]?:if(budget==0.0)"" else budget.toString(),
+     onValueChange={v->budgetInputs=budgetInputs+(t.name to v);v.replace(',','.').toDoubleOrNull()?.let{store.set(monthKey(selectedMonth),t.name,it);values=values+(t.name to it)}},
+     label={Text(t.name)},
+     singleLine=true,
+     keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),
+     modifier=Modifier.fillMaxWidth()
+    )
+    if(budget>0){
+     Text("Effettivo: ${money.format(actual)} · ${(pct*100).toInt()}%",color=when{pct>=1.0->NegativeColor;pct>=0.8->androidx.compose.ui.graphics.Color(0xFFF9A825);else->PositiveColor})
+    }
+   }
+  }}}
