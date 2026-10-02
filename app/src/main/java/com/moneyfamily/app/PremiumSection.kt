@@ -33,7 +33,13 @@ fun PremiumSection(
     var refreshKey by remember { mutableIntStateOf(0) }
 
     val setupRequired = billing.isPremiumSetupRequired()
-\n    LaunchedEffect(setupRequired, email) {\n        if (setupRequired && email == null) {\n            mode = "signup"\n        }\n    }\n
+
+    LaunchedEffect(setupRequired, email) {
+        if (setupRequired && email == null) {
+            mode = "signup"
+        }
+    }
+
     fun loadAccount() {
         if (!SupabaseClientProvider.isConfigured) return
         scope.launch {
