@@ -4,6 +4,7 @@ import com.moneyfamily.app.BuildConfig
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.FlowType
 import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 
@@ -15,6 +16,9 @@ object SupabaseClientProvider {
             supabaseKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
         ) {
             install(Auth) {
+                // Native Android authentication uses PKCE so confirmation/deep-link
+                // callbacks can be exchanged securely for a persistent session.
+                flowType = FlowType.PKCE
                 host = "auth-callback"
                 scheme = "moneyfamily"
                 autoLoadFromStorage = true
