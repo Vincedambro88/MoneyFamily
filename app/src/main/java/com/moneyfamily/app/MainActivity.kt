@@ -83,8 +83,9 @@ class MainActivity:ComponentActivity(){
             premiumSetupRequired = false
             scope.launch {
                 if (SupabaseClientProvider.isConfigured) {
-                    isPremium = supabaseRepo.isPremiumForCurrentAccount()
-                    if (isPremium) cloudSync.sync().onSuccess { refresh() }
+                    runCatching { isPremium = supabaseRepo.isPremiumForCurrentAccount() }
+                        .onFailure { isPremium = premiumBilling.isPremium() }
+                    cloudSync.sync().onSuccess { refresh() }
                 } else {
                     isPremium = true
                 }
@@ -99,7 +100,7 @@ class MainActivity:ComponentActivity(){
         }
     )
 }
- LaunchedEffect(Unit, authRefreshVersion){premiumSetupRequired=premiumBilling.isPremiumSetupRequired();premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{isPremium=supabaseRepo.isPremiumForCurrentAccount();cloudSync.sync().onSuccess { refresh() }}}else{isPremium=premiumBilling.isPremium()}}
+ LaunchedEffect(Unit, authRefreshVersion){premiumSetupRequired=premiumBilling.isPremiumSetupRequired();premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{runCatching{isPremium=supabaseRepo.isPremiumForCurrentAccount()}.onFailure{isPremium=premiumBilling.isPremium()};cloudSync.sync().onSuccess { refresh() }}}else{isPremium=premiumBilling.isPremium()}}
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
  fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh();cloudSync.sync().onSuccess { refresh() }}}
  fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh();cloudSync.sync().onSuccess { refresh() }}}
@@ -112,7 +113,7 @@ class MainActivity:ComponentActivity(){
   4->Icon(Icons.Outlined.AccountBalanceWallet,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF0891B2))
   else->Icon(painterResource(R.drawable.ic_premium),contentDescription=t,tint=androidx.compose.ui.graphics.Color.Unspecified)
  }
-},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh();cloudSync.sync().onSuccess { refresh() }}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()});4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium);5->PremiumSection(premiumBilling,supabaseRepo,isPremium,{v->isPremium=v;premiumSetupRequired=premiumBilling.isPremiumSetupRequired()},{scope.launch{if(SupabaseClientProvider.isConfigured){isPremium=supabaseRepo.isPremiumForCurrentAccount();cloudSync.sync().onSuccess { refresh() }}} },authRefreshVersion)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
+},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh();cloudSync.sync().onSuccess { refresh() }}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()});4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium);5->PremiumSection(premiumBilling,supabaseRepo,isPremium,{v->isPremium=v;premiumSetupRequired=premiumBilling.isPremiumSetupRequired()},{scope.launch{if(SupabaseClientProvider.isConfigured){runCatching{isPremium=supabaseRepo.isPremiumForCurrentAccount()};cloudSync.sync().onSuccess { refresh() }}} },authRefreshVersion)}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
 }
 
 @Composable private fun Dashboard(data:List<UiMovement>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit,isPremium:Boolean){
