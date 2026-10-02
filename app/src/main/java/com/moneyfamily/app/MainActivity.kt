@@ -100,11 +100,11 @@ class MainActivity:ComponentActivity(){
         }
     )
 }
- LaunchedEffect(Unit, authRefreshVersion){premiumSetupRequired=premiumBilling.isPremiumSetupRequired();premiumBilling.connect();refresh();if(SupabaseClientProvider.isConfigured){scope.launch{runCatching{isPremium=supabaseRepo.isPremiumForCurrentAccount()}.onFailure{isPremium=premiumBilling.isPremium()};cloudSync.sync().onSuccess { refresh() }}}else{isPremium=premiumBilling.isPremium()}}
+ LaunchedEffect(Unit, authRefreshVersion){premiumSetupRequired=premiumBilling.isPremiumSetupRequired();isPremium=premiumBilling.isPremium();refresh()}
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
  fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh();cloudSync.sync().onSuccess { refresh() }}}
  fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh();cloudSync.sync().onSuccess { refresh() }}}
- MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni","Budget","Premium").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i},icon={
+ MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni","Budget","Premium").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i;if(i==5)premiumBilling.connect()},icon={
  when(i){
   0->Icon(Icons.Outlined.Dashboard,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF2563EB))
   1->Icon(Icons.Outlined.ListAlt,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF7C3AED))
