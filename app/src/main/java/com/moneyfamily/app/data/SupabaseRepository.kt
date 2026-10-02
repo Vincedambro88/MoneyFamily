@@ -29,11 +29,18 @@ class SupabaseRepository(
     }
 
     suspend fun signUp(email: String, password: String): String? = withContext(Dispatchers.IO) {
-        client.auth.signUpWith(Email, redirectUrl = SupabaseClientProvider.AUTH_REDIRECT_URL) {
+        // Confirm Email is disabled in the hosted Supabase project for the
+        // production MoneyFamily flow. Kotlin adopts the returned session
+        // automatically, so the account is immediately usable without an
+        // email/redirect round-trip.
+        client.auth.signUpWith(Email) {
             this.email = email.trim()
             this.password = password
         }
-        client.auth.currentUserOrNull()?.id
+        val userId = client.auth.currentUserOrNull()?.id
+            ?: error("Account creato ma sessione Cloud non disponibile.")
+        ensureAccountWorkspace()
+        userId
     }
 
     suspend fun signIn(email: String, password: String) = withContext(Dispatchers.IO) {
