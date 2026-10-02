@@ -84,7 +84,7 @@ class MainActivity:ComponentActivity(){
             scope.launch {
                 if (SupabaseClientProvider.isConfigured) {
                     runCatching { isPremium = supabaseRepo.isPremiumForCurrentAccount() }
-                        .onFailure { isPremium = premiumBilling.isPremium() }
+                        .onFailure { isPremium = false }
                     cloudSync.sync().onSuccess { refresh() }
                 } else {
                     isPremium = true
