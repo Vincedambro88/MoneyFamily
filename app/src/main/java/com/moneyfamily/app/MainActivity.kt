@@ -94,7 +94,6 @@ class MainActivity:ComponentActivity(){
             }
         },
         onPurchaseDetected = {
-            premiumVerificationError = null
             premiumSetupRequired = true
             tab = 5
         },
