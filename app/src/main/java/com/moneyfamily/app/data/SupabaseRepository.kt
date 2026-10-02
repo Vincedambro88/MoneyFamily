@@ -1,7 +1,7 @@
 package com.moneyfamily.app.data
 
 import com.moneyfamily.app.BuildConfig
-
+import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.functions.functions
@@ -18,8 +18,12 @@ import kotlinx.serialization.json.boolean
 import io.ktor.client.statement.bodyAsText
 
 class SupabaseRepository(
-    private val client: io.github.jan.supabase.SupabaseClient = SupabaseClientProvider.client
+    private val injectedClient: SupabaseClient? = null
 ) {
+    private val client: SupabaseClient by lazy {
+        injectedClient ?: SupabaseClientProvider.client
+    }
+
     suspend fun currentUserId(): String? = withContext(Dispatchers.IO) {
         client.auth.currentUserOrNull()?.id
     }
@@ -29,10 +33,6 @@ class SupabaseRepository(
     }
 
     suspend fun signUp(email: String, password: String): String? = withContext(Dispatchers.IO) {
-        // Confirm Email is disabled in the hosted Supabase project for the
-        // production MoneyFamily flow. Kotlin adopts the returned session
-        // automatically, so the account is immediately usable without an
-        // email/redirect round-trip.
         client.auth.signUpWith(Email) {
             this.email = email.trim()
             this.password = password
@@ -62,9 +62,7 @@ class SupabaseRepository(
     }
 
     suspend fun familiesForCurrentUser(): List<SupabaseFamilyDto> = withContext(Dispatchers.IO) {
-        client.from("families")
-            .select()
-            .decodeList<SupabaseFamilyDto>()
+        client.from("families").select().decodeList<SupabaseFamilyDto>()
     }
 
     suspend fun familyMembers(familyId: String): List<SupabaseFamilyMemberDto> =
@@ -75,32 +73,22 @@ class SupabaseRepository(
         }
 
     suspend fun createFamily(name: String): String = withContext(Dispatchers.IO) {
-        val parameters = buildJsonObject {
-            put("family_name", name.trim())
-        }
         client.postgrest.rpc(
             "create_family",
-            parameters
+            buildJsonObject { put("family_name", name.trim()) }
         ).decodeSingle<String>()
     }
 
-    /**
-     * Account-centric Cloud workspace.
-     *
-     * The database keeps the existing family_id relationships internally for
-     * backwards compatibility, but the user does not create or manage a family.
-     * One authenticated MoneyFamily account owns one hidden workspace shared by
-     * all devices logged into that account.
-     */
     suspend fun ensureAccountWorkspace(): String = withContext(Dispatchers.IO) {
-        val userId = client.auth.currentUserOrNull()?.id
+        client.auth.currentUserOrNull()?.id
             ?: error("Devi effettuare l'accesso all'account MoneyFamily.")
         familiesForCurrentUser().firstOrNull()?.id
             ?: createFamily("MoneyFamily Account")
     }
 
     suspend fun isPremiumForCurrentAccount(): Boolean = withContext(Dispatchers.IO) {
-        if (BuildConfig.INTERNAL_PREMIUM_TEST && client.auth.currentUserOrNull()?.id != null) return@withContext true
+        if (BuildConfig.INTERNAL_PREMIUM_TEST && client.auth.currentUserOrNull()?.id != null)
+            return@withContext true
         if (client.auth.currentUserOrNull()?.id == null) return@withContext false
         val familyId = ensureAccountWorkspace()
         client.postgrest.rpc(
@@ -109,12 +97,11 @@ class SupabaseRepository(
         ).decodeSingle<Boolean>()
     }
 
-suspend fun isPremiumForCurrentFamily(): Boolean = runCatching {
+    suspend fun isPremiumForCurrentFamily(): Boolean = runCatching {
         isPremiumForCurrentAccount()
     }.getOrDefault(false)
 
     suspend fun verifyPremiumPurchase(purchaseToken: String): Boolean = withContext(Dispatchers.IO) {
-        // Purchase verification is intentionally account-gated.
         if (client.auth.currentUserOrNull()?.id == null) return@withContext false
         ensureAccountWorkspace()
         runCatching {
