@@ -7,15 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
-import com.android.billingclient.api.BillingClient
-import com.android.billingclient.api.BillingClientStateListener
-import com.android.billingclient.api.BillingFlowParams
-import com.android.billingclient.api.BillingResult
-import com.android.billingclient.api.PendingPurchasesParams
-import com.android.billingclient.api.ProductDetails
-import com.android.billingclient.api.Purchase
-import com.android.billingclient.api.QueryProductDetailsParams
-import com.android.billingclient.api.QueryPurchasesParams
+import com.android.billingclient.api.*
 
 class PremiumBilling(
     context: Context,
@@ -27,135 +19,136 @@ class PremiumBilling(
 
     private val prefs = context.getSharedPreferences("moneyfamily_premium", Context.MODE_PRIVATE)
     private val billingClient = BillingClient.newBuilder(context.applicationContext)
-        .setListener { result, purchases -> handlePurchases(result, purchases) }
-        .enablePendingPurchases(
-            PendingPurchasesParams.newBuilder().enableOneTimeProducts().build()
-        )
+        .setListener { result, purchases -> safe { handlePurchases(result, purchases) } }
+        .enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
         .build()
 
     private var productDetails: ProductDetails? = null
     private var selectedOffer: ProductDetails.OneTimePurchaseOfferDetails? = null
+    private var connected = false
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun connect() {
-        billingClient.startConnection(object : BillingClientStateListener {
-            override fun onBillingSetupFinished(result: BillingResult) {
-                if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                    queryProduct()
-                    queryOwned()
-                }
+        safe {
+            if (billingClient.isReady) {
+                connected = true
+                queryProduct()
+                queryOwned()
+            } else {
+                billingClient.startConnection(object : BillingClientStateListener {
+                    override fun onBillingSetupFinished(result: BillingResult) {
+                        safe {
+                            connected = result.responseCode == BillingClient.BillingResponseCode.OK
+                            if (connected) { queryProduct(); queryOwned() }
+                        }
+                    }
+                    override fun onBillingServiceDisconnected() { connected = false }
+                })
             }
-            override fun onBillingServiceDisconnected() = Unit
-        })
+        }
     }
 
-    fun isPremium(): Boolean = prefs.getBoolean("premium", false) || (BuildConfig.INTERNAL_PREMIUM_TEST && prefs.getBoolean("internal_test_premium", false))
+    fun isPremium(): Boolean =
+        prefs.getBoolean("premium", false) ||
+        (BuildConfig.INTERNAL_PREMIUM_TEST && prefs.getBoolean("internal_test_premium", false))
 
     fun enableInternalTestPremium() {
         if (!BuildConfig.INTERNAL_PREMIUM_TEST) return
-        prefs.edit().putBoolean("internal_test_premium", true).putBoolean("premium", true).apply()
-        onPremiumChanged(true)
+        safe {
+            prefs.edit().putBoolean("internal_test_premium", true).putBoolean("premium", true).apply()
+            onPremiumChanged(true)
+        }
     }
 
     fun isPremiumSetupRequired(): Boolean = prefs.getBoolean("premium_setup_required", false)
 
     fun recheckOwnedPurchases() {
-        val pending = prefs.getString("pending_purchase_token", null)
-        if (pending != null) verifyAndSetPremium(pending)
-        queryOwned()
+        safe {
+            if (!connected) { connect(); return@safe }
+            prefs.getString("pending_purchase_token", null)?.let { verifyAndSetPremium(it) }
+            queryOwned()
+        }
     }
 
-    fun launchPurchase(activity: Activity): Boolean {
-        val product = productDetails ?: return false
-        val offer = selectedOffer
-            ?: product.oneTimePurchaseOfferDetailsList?.firstOrNull()
-            ?: return false
-        val offerToken = offer.offerToken ?: return false
-
+    fun launchPurchase(activity: Activity): Boolean? = safeResult {
+        if (!connected || !billingClient.isReady) { connect(); return@safeResult false }
+        val product = productDetails ?: return@safeResult false
+        val offer = selectedOffer ?: product.oneTimePurchaseOfferDetailsList?.firstOrNull()
+            ?: return@safeResult false
+        val offerToken = offer.offerToken ?: return@safeResult false
         val params = BillingFlowParams.ProductDetailsParams.newBuilder()
-            .setProductDetails(product)
-            .setOfferToken(offerToken)
-            .build()
-
-        val result = billingClient.launchBillingFlow(
+            .setProductDetails(product).setOfferToken(offerToken).build()
+        billingClient.launchBillingFlow(
             activity,
-            BillingFlowParams.newBuilder()
-                .setProductDetailsParamsList(listOf(params))
-                .build()
-        )
-        return result.responseCode == BillingClient.BillingResponseCode.OK
+            BillingFlowParams.newBuilder().setProductDetailsParamsList(listOf(params)).build()
+        ).responseCode == BillingClient.BillingResponseCode.OK
     }
 
     fun price(): String? = selectedOffer?.formattedPrice
 
     fun close() {
-        billingClient.endConnection()
+        safe { billingClient.endConnection() }
+        connected = false
         scope.cancel()
     }
 
     private fun queryProduct() {
-        val product = QueryProductDetailsParams.Product.newBuilder()
-            .setProductId(PRODUCT_ID)
-            .setProductType(BillingClient.ProductType.INAPP)
-            .build()
-        billingClient.queryProductDetailsAsync(
-            QueryProductDetailsParams.newBuilder().setProductList(listOf(product)).build()
-        ) { result, detailsResult ->
-            if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                productDetails = detailsResult.productDetailsList.firstOrNull()
-                selectedOffer = productDetails?.oneTimePurchaseOfferDetailsList?.firstOrNull()
-            } else {
-                productDetails = null
-                selectedOffer = null
+        safe {
+            val product = QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(PRODUCT_ID).setProductType(BillingClient.ProductType.INAPP).build()
+            billingClient.queryProductDetailsAsync(
+                QueryProductDetailsParams.newBuilder().setProductList(listOf(product)).build()
+            ) { result, details ->
+                safe {
+                    if (result.responseCode == BillingClient.BillingResponseCode.OK) {
+                        productDetails = details.productDetailsList.firstOrNull()
+                        selectedOffer = productDetails?.oneTimePurchaseOfferDetailsList?.firstOrNull()
+                    } else { productDetails = null; selectedOffer = null }
+                }
             }
         }
     }
 
     private fun queryOwned() {
-        billingClient.queryPurchasesAsync(
-            QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build()
-        ) { result, purchases ->
-            if (result.responseCode == BillingClient.BillingResponseCode.OK) handlePurchases(result, purchases)
+        safe {
+            billingClient.queryPurchasesAsync(
+                QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build()
+            ) { result, purchases ->
+                safe { if (result.responseCode == BillingClient.BillingResponseCode.OK) handlePurchases(result, purchases) }
+            }
         }
     }
 
     private fun handlePurchases(result: BillingResult, purchases: List<Purchase>?) {
         if (result.responseCode != BillingClient.BillingResponseCode.OK) return
-        purchases.orEmpty().filter { it.products.contains(PRODUCT_ID) && it.purchaseState == Purchase.PurchaseState.PURCHASED }
+        purchases.orEmpty()
+            .filter { it.products.contains(PRODUCT_ID) && it.purchaseState == Purchase.PurchaseState.PURCHASED }
             .forEach { purchase ->
-                prefs.edit()
-                    .putBoolean("premium_setup_required", true)
-                    .putString("pending_purchase_token", purchase.purchaseToken)
-                    .apply()
-                onPurchaseDetected()
-
-                if (!purchase.isAcknowledged) {
-                    billingClient.acknowledgePurchase(
-                        com.android.billingclient.api.AcknowledgePurchaseParams.newBuilder()
-                            .setPurchaseToken(purchase.purchaseToken)
-                            .build()
-                    ) { ack ->
-                        if (ack.responseCode == BillingClient.BillingResponseCode.OK) verifyAndSetPremium(purchase.purchaseToken)
-                    }
-                } else {
-                    verifyAndSetPremium(purchase.purchaseToken)
+                safe {
+                    prefs.edit().putBoolean("premium_setup_required", true)
+                        .putString("pending_purchase_token", purchase.purchaseToken).apply()
+                    onPurchaseDetected()
+                    if (!purchase.isAcknowledged) {
+                        billingClient.acknowledgePurchase(
+                            AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.purchaseToken).build()
+                        ) { ack -> safe { if (ack.responseCode == BillingClient.BillingResponseCode.OK) verifyAndSetPremium(purchase.purchaseToken) } }
+                    } else verifyAndSetPremium(purchase.purchaseToken)
                 }
             }
     }
 
-    private fun verifyAndSetPremium(purchaseToken: String) {
+    private fun verifyAndSetPremium(token: String) {
         scope.launch {
-            runCatching { verifyPurchase(purchaseToken) }
-                .onSuccess { verified ->
-                    if (verified) {
-                        prefs.edit()
-                            .putBoolean("premium", true)
-                            .putBoolean("premium_setup_required", false)
-                            .remove("pending_purchase_token")
-                            .apply()
-                        onPremiumChanged(true)
-                    }
+            runCatching { verifyPurchase(token) }.onSuccess { verified ->
+                if (verified) safe {
+                    prefs.edit().putBoolean("premium", true).putBoolean("premium_setup_required", false)
+                        .remove("pending_purchase_token").apply()
+                    onPremiumChanged(true)
                 }
+            }
         }
     }
+
+    private inline fun safe(block: () -> Unit) { runCatching { block() } }
+    private inline fun <T> safeResult(block: () -> T): T? = runCatching { block() }.getOrNull()
 }
