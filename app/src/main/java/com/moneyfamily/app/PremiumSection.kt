@@ -75,10 +75,9 @@ fun PremiumSection(
                     supabaseRepo.signIn(inputEmail, password)
                     supabaseRepo.ensureAccountWorkspace()
                 } else {
-                    // With email confirmation enabled Supabase creates the user
-                    // but does not establish a session until the confirmation
-                    // link is opened. Workspace creation therefore happens
-                    // after the callback/deep-link, not here.
+                    // Production flow: Supabase Confirm Email is disabled.
+                    // Signup therefore creates an authenticated Cloud session
+                    // immediately and the account workspace is created now.
                     supabaseRepo.signUp(inputEmail, password)
                 }
             }.onSuccess {
@@ -234,7 +233,7 @@ fun PremiumSection(
 
                         if (mode == "signup") {
                             Text(
-                                "Se la conferma email è attiva, apri il link ricevuto e torna nell'app.",
+                                "Account Cloud: dopo la registrazione verrai autenticato automaticamente e i dati Premium saranno sincronizzati tra i dispositivi.",
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
