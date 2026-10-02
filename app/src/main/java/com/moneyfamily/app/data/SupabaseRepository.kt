@@ -102,18 +102,24 @@ class SupabaseRepository(
     }.getOrDefault(false)
 
     suspend fun verifyPremiumPurchase(purchaseToken: String): Boolean = withContext(Dispatchers.IO) {
-        if (client.auth.currentUserOrNull()?.id == null) return@withContext false
+        if (client.auth.currentUserOrNull()?.id == null)
+            error("Account MoneyFamily non autenticato.")
         ensureAccountWorkspace()
-        runCatching {
-            val response = client.functions.invoke(
-                function = "verify-premium-purchase",
-                body = buildJsonObject {
-                    put("purchaseToken", purchaseToken)
-                    put("productId", "moneyfamily_premium")
-                }
-            )
-            val payload = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-            payload["premium"]?.jsonPrimitive?.boolean == true
-        }.getOrDefault(false)
+        val response = client.functions.invoke(
+            function = "verify-premium-purchase",
+            body = buildJsonObject {
+                put("purchaseToken", purchaseToken)
+                put("productId", "moneyfamily_premium")
+            }
+        )
+        val text = response.bodyAsText()
+        val payload = runCatching {
+            Json.parseToJsonElement(text).jsonObject
+        }.getOrElse {
+            error("Risposta verifica Premium non valida.")
+        }
+        if (payload["premium"]?.jsonPrimitive?.boolean == true) return@withContext true
+        val backendError = payload["error"]?.jsonPrimitive?.content
+        error(backendError ?: "Verifica Premium non completata.")
     }
 }
