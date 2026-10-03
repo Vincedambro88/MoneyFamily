@@ -181,7 +181,7 @@ fun PremiumSection(
                                         cloudBusy = true
                                         cloudMessage = null
                                         try {
-                                            withTimeout(30_000L) {
+                                            withTimeout(60_000L) {
                                                 cloudSync.sync()
                                                     .onSuccess {
                                                         cloudMessage = "Dati salvati sul Cloud correttamente."
@@ -192,7 +192,7 @@ fun PremiumSection(
                                             }
                                         } catch (t: Throwable) {
                                             cloudMessage = if (t is kotlinx.coroutines.TimeoutCancellationException) {
-                                                "Salvataggio Cloud non riuscito: timeout dopo 30 secondi."
+                                                "Salvataggio Cloud non riuscito: timeout dopo 60 secondi."
                                             } else {
                                                 "Salvataggio Cloud non riuscito: " + (t.message ?: "errore")
                                             }
@@ -212,7 +212,7 @@ fun PremiumSection(
                                         cloudBusy = true
                                         cloudMessage = null
                                         try {
-                                            withTimeout(30_000L) {
+                                            withTimeout(60_000L) {
                                                 cloudSync.sync()
                                                     .onSuccess {
                                                         cloudMessage = "Dati del Cloud caricati sul dispositivo."
@@ -223,7 +223,7 @@ fun PremiumSection(
                                             }
                                         } catch (t: Throwable) {
                                             cloudMessage = if (t is kotlinx.coroutines.TimeoutCancellationException) {
-                                                "Caricamento Cloud non riuscito: timeout dopo 30 secondi."
+                                                "Caricamento Cloud non riuscito: timeout dopo 60 secondi."
                                             } else {
                                                 "Caricamento Cloud non riuscito: " + (t.message ?: "errore")
                                             }
