@@ -50,6 +50,10 @@ class RoomRepository(private val context: Context) {
         dao.update(current.copy(cloudId = cloudId, updatedAt = updatedAt ?: current.updatedAt))
     }
 
+    suspend fun setCloudIds(items: List<MovementEntity>) = db.withTransaction {
+        if (items.isNotEmpty()) dao.updateAll(items)
+    }
+
     suspend fun insertCloud(item: Movement, cloudId: String, updatedAt: String = java.time.Instant.now().toString()) {
         dao.insert(item.toEntity().copy(cloudId = cloudId, updatedAt = updatedAt))
     }
