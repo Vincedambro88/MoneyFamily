@@ -21,6 +21,9 @@ interface MovementDao {
     @Update
     suspend fun update(item: MovementEntity)
 
+    @Update
+    suspend fun updateAll(items: List<MovementEntity>)
+
     @Delete
     suspend fun delete(item: MovementEntity)
 
