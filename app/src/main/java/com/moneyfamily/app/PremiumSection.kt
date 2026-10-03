@@ -182,9 +182,9 @@ fun PremiumSection(
                                         cloudMessage = null
                                         try {
                                             withTimeout(60_000L) {
-                                                cloudSync.sync()
-                                                    .onSuccess {
-                                                        cloudMessage = "Dati salvati sul Cloud correttamente."
+                                                cloudSync.saveToCloud()
+                                                    .onSuccess { count ->
+                                                        cloudMessage = "Cloud aggiornato: $count operazioni salvate."
                                                     }
                                                     .onFailure {
                                                         cloudMessage = "Salvataggio Cloud non riuscito: " + (it.message ?: "errore")
@@ -213,9 +213,9 @@ fun PremiumSection(
                                         cloudMessage = null
                                         try {
                                             withTimeout(60_000L) {
-                                                cloudSync.sync()
-                                                    .onSuccess {
-                                                        cloudMessage = "Dati del Cloud caricati sul dispositivo."
+                                                cloudSync.loadFromCloud()
+                                                    .onSuccess { count ->
+                                                        cloudMessage = "Caricamento completato: $count nuove operazioni importate."
                                                     }
                                                     .onFailure {
                                                         cloudMessage = "Caricamento Cloud non riuscito: " + (it.message ?: "errore")
@@ -240,7 +240,7 @@ fun PremiumSection(
                         cloudMessage?.let {
                             Text(
                                 it,
-                                color = if (it.startsWith("Dati salvati")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                color = if (it.startsWith("Cloud aggiornato") || it.startsWith("Caricamento completato")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
