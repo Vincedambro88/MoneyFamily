@@ -25,10 +25,12 @@ class SupabaseRepository(
     }
 
     suspend fun currentUserId(): String? = withContext(Dispatchers.IO) {
+        client.auth.awaitInitialization()
         client.auth.currentUserOrNull()?.id
     }
 
     suspend fun currentUserEmail(): String? = withContext(Dispatchers.IO) {
+        client.auth.awaitInitialization()
         client.auth.currentUserOrNull()?.email
     }
 
