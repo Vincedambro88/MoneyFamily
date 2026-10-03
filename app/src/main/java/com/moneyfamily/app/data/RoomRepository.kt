@@ -4,6 +4,12 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.withTransaction
 
+data class MovementWithCloudId(
+    val movement: Movement,
+    val cloudId: String,
+    val updatedAt: String
+)
+
 class RoomRepository(private val context: Context) {
     private val db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "moneyfamily.db")
          .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
@@ -32,6 +38,12 @@ class RoomRepository(private val context: Context) {
     suspend fun removeTombstone(cloudId: String) = tombstones.delete(cloudId)
     suspend fun clearTombstones() = tombstones.deleteAll()
     suspend fun deleteByCloudId(cloudId: String) = dao.deleteByCloudId(cloudId)
+
+    suspend fun replaceOperationsFromCloud(items: List<MovementWithCloudId>) = db.withTransaction {
+        dao.deleteAll()
+        tombstones.deleteAll()
+        dao.insertAll(items.map { it.movement.toEntity().copy(cloudId = it.cloudId, updatedAt = it.updatedAt) })
+    }
 
     suspend fun setCloudId(localId: Long, cloudId: String, updatedAt: String? = null) {
         val current = dao.getAll().firstOrNull { it.id == localId } ?: return
