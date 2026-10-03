@@ -95,3 +95,5 @@ jobs:
             app/build/outputs/bundle/release/app-release.aab
             app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+
+# Password recovery deeplink release validation
