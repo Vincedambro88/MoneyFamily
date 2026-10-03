@@ -22,7 +22,8 @@ fun PremiumSection(
     onPremiumChanged: (Boolean) -> Unit,
     onAccountChanged: () -> Unit,
     onCloudDataChanged: suspend () -> Unit = {},
-    authRefreshVersion: Int = 0
+    authRefreshVersion: Int = 0,
+    passwordRecovery: Boolean = false
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -33,6 +34,9 @@ fun PremiumSection(
     var mode by remember { mutableStateOf("login") }
     var inputEmail by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var recoveryActive by remember(passwordRecovery) { mutableStateOf(passwordRecovery) }
+    var resetSent by remember { mutableStateOf(false) }
     var refreshKey by remember { mutableIntStateOf(0) }
     var cloudBusy by remember { mutableStateOf(false) }
     var cloudMessage by remember { mutableStateOf<String?>(null) }
@@ -297,26 +301,142 @@ fun PremiumSection(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        OutlinedTextField(
-                            value = password,
-                            onValueChange = { password = it },
-                            label = { Text("Password") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Button(
-                            enabled = !busy && inputEmail.isNotBlank() && password.length >= 6,
-                            onClick = ::authenticate,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                if (busy) "Attendere…"
-                                else if (mode == "login") "Accedi"
-                                else "Crea account"
+                        if (recoveryActive) {
+                            Text("Reimposta la password", style = MaterialTheme.typography.titleMedium)
+                            Text("Inserisci la nuova password per completare il recupero dell'account.")
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = { password = it },
+                                label = { Text("Nuova password") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
                             )
+                            OutlinedTextField(
+                                value = confirmPassword,
+                                onValueChange = { confirmPassword = it },
+                                label = { Text("Conferma nuova password") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            if (password.isNotBlank() && password.length < 6) {
+                                Text("La password deve contenere almeno 6 caratteri.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
+                            if (confirmPassword.isNotBlank() && confirmPassword != password) {
+                                Text("Le password non coincidono.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Button(
+                                enabled = !busy && password.length >= 6 && password == confirmPassword,
+                                onClick = {
+                                    scope.launch {
+                                        busy = true
+                                        error = null
+                                        runCatching { supabaseRepo.updatePassword(password) }
+                                            .onSuccess {
+                                                password = ""
+                                                confirmPassword = ""
+                                                recoveryActive = false
+                                                resetSent = false
+                                                mode = "login"
+                                                refreshKey++
+                                            }
+                                            .onFailure {
+                                                error = it.message ?: "Impossibile aggiornare la password."
+                                            }
+                                        busy = false
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(if (busy) "Attendere…" else "Aggiorna password")
+                            }
+                            TextButton(
+                                onClick = {
+                                    recoveryActive = false
+                                    mode = "login"
+                                    error = null
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Annulla")
+                            }
+                        } else if (mode == "reset") {
+                            Text("Recupera password", style = MaterialTheme.typography.titleMedium)
+                            Text("Inserisci la tua email per ricevere il link per reimpostare la password.")
+                            OutlinedTextField(
+                                value = inputEmail,
+                                onValueChange = { inputEmail = it },
+                                label = { Text("Email") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Button(
+                                enabled = !busy && inputEmail.isNotBlank(),
+                                onClick = {
+                                    scope.launch {
+                                        busy = true
+                                        error = null
+                                        resetSent = false
+                                        runCatching { supabaseRepo.sendPasswordReset(inputEmail) }
+                                            .onSuccess { resetSent = true }
+                                            .onFailure { error = it.message ?: "Impossibile inviare il link di recupero." }
+                                        busy = false
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(if (busy) "Attendere…" else "Invia link di recupero")
+                            }
+                            if (resetSent) {
+                                Text(
+                                    "Se l'indirizzo è associato a un account, riceverai le istruzioni per impostare una nuova password.",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            TextButton(
+                                onClick = {
+                                    mode = "login"
+                                    error = null
+                                    resetSent = false
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Torna ad Accedi")
+                            }
+                        } else {
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = { password = it },
+                                label = { Text("Password") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Button(
+                                enabled = !busy && inputEmail.isNotBlank() && password.length >= 6,
+                                onClick = ::authenticate,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    if (busy) "Attendere…"
+                                    else if (mode == "login") "Accedi"
+                                    else "Crea account"
+                                )
+                            }
+                            if (mode == "login") {
+                                TextButton(
+                                    onClick = {
+                                        mode = "reset"
+                                        error = null
+                                        resetSent = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Password dimenticata?")
+                                }
+                            }
                         }
 
-                        if (mode == "signup") {
+                        if (mode == "signup" && !recoveryActive) {
                             Text(
                                 "Account Cloud: dopo la registrazione verrai autenticato automaticamente e i dati Premium saranno sincronizzati tra i dispositivi.",
                                 style = MaterialTheme.typography.bodySmall
