@@ -85,7 +85,8 @@ class SupabaseRepository(
     suspend fun ensureAccountWorkspace(): String = withContext(Dispatchers.IO) {
         client.auth.currentUserOrNull()?.id
             ?: error("Devi effettuare l'accesso all'account MoneyFamily.")
-        familiesForCurrentUser().firstOrNull()?.id
+        client.postgrest.rpc("get_account_family_id")
+            .decodeSingleOrNull<String>()
             ?: createFamily("MoneyFamily Account")
     }
 
