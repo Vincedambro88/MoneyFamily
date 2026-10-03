@@ -2,10 +2,6 @@ package com.moneyfamily.app.data
 
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -17,17 +13,6 @@ class CloudSyncRepository(
     private val supabase: SupabaseRepository = SupabaseRepository(),
     private val budgetStore: BudgetStore? = null
 ) {
-    suspend fun sync(): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            if (!SupabaseClientProvider.isConfigured || supabase.currentUserId() == null) return@runCatching
-            val familyId = supabase.familiesForCurrentUser().firstOrNull()?.id
-                ?: supabase.createFamily("La mia famiglia")
-            syncReferenceData(familyId)
-            syncOperations(familyId)
-            syncBudgets(familyId)
-        }
-    }
-
     private suspend fun syncReferenceData(familyId: String) {
         val localTypes = room.allTypes()
         val localCategories = room.allCategories()
@@ -188,10 +173,10 @@ class CloudSyncRepository(
 
             val result = supabase.client.postgrest.rpc(
                 "replace_family_operations",
-                buildJsonObject {
-                    put("p_family_id", familyId)
-                    put("p_operations", Json.encodeToJsonElement(payloads))
-                }
+                ReplaceOperationsParams(
+                    pFamilyId = familyId,
+                    pOperations = payloads
+                )
             ).decodeSingle<ReplaceOperationsResult>()
 
             room.clearTombstones()
@@ -354,6 +339,12 @@ class CloudSyncRepository(
 
     private val SupabaseRepository.client get() = SupabaseClientProvider.client
 }
+
+@Serializable
+private data class ReplaceOperationsParams(
+    @SerialName("p_family_id") val pFamilyId: String,
+    @SerialName("p_operations") val pOperations: List<CloudOperationDto>
+)
 
 @Serializable
 private data class ReplaceOperationsResult(
