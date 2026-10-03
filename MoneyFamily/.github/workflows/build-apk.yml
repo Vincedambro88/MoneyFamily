@@ -29,3 +29,5 @@ jobs:
         with:
           name: MoneyFamily-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+
+# Explicit password recovery redirect validation
