@@ -107,6 +107,7 @@ class CloudSyncRepository(
         }
 
         // Push local mappings as well, including mappings created after the import.
+        val mappingPayloads = mutableListOf<CloudTypeCategoryLinkDto>()
         for (mapping in room.allMappings()) {
             val type = syncedTypes.firstOrNull { it.id == mapping.typeId } ?: continue
             val category = syncedCategories.firstOrNull { it.id == mapping.categoryId } ?: continue
@@ -114,14 +115,16 @@ class CloudSyncRepository(
                 ?: UUID.nameUUIDFromBytes((familyId + ":type:" + type.name.lowercase()).toByteArray()).toString()
             val categoryId = remoteCategories.firstOrNull { it.name.equals(category.name, true) }?.id
                 ?: UUID.nameUUIDFromBytes((familyId + ":category:" + category.name.lowercase()).toByteArray()).toString()
-            supabase.client.from("type_category_links").upsert(
-                CloudTypeCategoryLinkDto(familyId, typeId, categoryId)
-            )
+            mappingPayloads += CloudTypeCategoryLinkDto(familyId, typeId, categoryId)
+        }
+        if (mappingPayloads.isNotEmpty()) {
+            supabase.client.from("type_category_links").upsert(mappingPayloads)
         }
     }
 
     private suspend fun syncOperations(familyId: String) {
         val local = room.allEntities()
+        val currentUserId = supabase.currentUserId()
 
         val remoteTypes = supabase.client.from("typologies").select {
             filter { eq("family_id", familyId) }
@@ -157,7 +160,7 @@ class CloudSyncRepository(
                     description = "",
                     operationDate = "1970-01-01",
                     paymentMethod = "",
-                    createdBy = supabase.currentUserId(),
+                    createdBy = currentUserId,
                     updatedAt = tombstone.deletedAt,
                     deletedAt = tombstone.deletedAt
                 )
@@ -225,14 +228,14 @@ class CloudSyncRepository(
                 description = movement.description,
                 operationDate = movement.date.toSupabaseDate(),
                 paymentMethod = movement.paymentMethod,
-                createdBy = supabase.currentUserId(),
+                createdBy = currentUserId,
                 updatedAt = timestamp,
                 deletedAt = null
             )
             room.setCloudId(movement.id, cloudId, timestamp)
         }
 
-        pendingOperations.chunked(100).forEach { chunk ->
+        pendingOperations.chunked(250).forEach { chunk ->
             supabase.client.from("operations").upsert(chunk)
         }
 
@@ -277,6 +280,7 @@ class CloudSyncRepository(
     private suspend fun syncBudgets(familyId: String) {
         val store = budgetStore ?: return
         val localBudgets = store.all()
+        val currentUserId = supabase.currentUserId()
         val remoteTypes = supabase.client.from("typologies").select {
             filter { eq("family_id", familyId) }
         }.decodeList<CloudTypologyDto>()
@@ -302,7 +306,7 @@ class CloudSyncRepository(
                         year = year,
                         month = month,
                         amount = amount,
-                        createdBy = supabase.currentUserId(),
+                        createdBy = currentUserId,
                         createdAt = java.time.Instant.now().toString(),
                         updatedAt = java.time.Instant.now().toString()
                     )
