@@ -27,6 +27,7 @@ class PremiumBilling(
     private var productDetails: ProductDetails? = null
     private var selectedOffer: ProductDetails.OneTimePurchaseOfferDetails? = null
     private var connected = false
+    @Volatile private var verificationInFlight = false
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun connect() {
@@ -88,6 +89,7 @@ class PremiumBilling(
     fun price(): String? = selectedOffer?.formattedPrice
 
     fun close() {
+        verificationInFlight = false
         safe { billingClient.endConnection() }
         connected = false
         scope.cancel()
@@ -139,6 +141,10 @@ class PremiumBilling(
     }
 
     private fun verifyAndSetPremium(token: String) {
+        synchronized(this) {
+            if (verificationInFlight) return
+            verificationInFlight = true
+        }
         scope.launch {
             runCatching { verifyPurchase(token) }
                 .onSuccess { verified ->
@@ -150,6 +156,9 @@ class PremiumBilling(
                 }
                 .onFailure { error ->
                     safe { onVerificationError(error.message ?: "Verifica Premium non completata.") }
+                }
+                .also {
+                    synchronized(this@PremiumBilling) { verificationInFlight = false }
                 }
         }
     }
