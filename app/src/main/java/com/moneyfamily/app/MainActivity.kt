@@ -52,11 +52,11 @@ class MainActivity:ComponentActivity(){
  private var passwordRecovery by mutableStateOf(false)
  private fun isPasswordRecoveryIntent(intent: Intent): Boolean =
   intent.data?.scheme == "moneyfamily" && intent.data?.host == "auth-callback"
- override fun onCreate(s:Bundle?){super.onCreate(s);passwordRecovery=isPasswordRecoveryIntent(intent);runCatching { if (SupabaseClientProvider.isConfigured) SupabaseClientProvider.client.handleDeeplinks(intent) };setContent{MoneyFamilyApp(authRefreshVersion,passwordRecovery)}}
+ override fun onCreate(s:Bundle?){super.onCreate(s);passwordRecovery=isPasswordRecoveryIntent(intent);runCatching { if (SupabaseClientProvider.isConfigured) SupabaseClientProvider.client.handleDeeplinks(intent) };setContent{MoneyFamilyApp(authRefreshVersion,passwordRecovery){passwordRecovery=false}}
  override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);passwordRecovery=isPasswordRecoveryIntent(intent);runCatching { if (SupabaseClientProvider.isConfigured) SupabaseClientProvider.client.handleDeeplinks(intent) };authRefreshVersion++}
 }
 
-@Composable private fun MoneyFamilyApp(authRefreshVersion:Int=0,passwordRecovery:Boolean=false){
+@Composable private fun MoneyFamilyApp(authRefreshVersion:Int=0,passwordRecovery:Boolean=false,onPasswordRecoveryCompleted:()->Unit={}){
  val c=LocalContext.current
  val repo=remember{RoomRepository(c)}
  val supabaseRepo=remember{SupabaseRepository()}
@@ -146,7 +146,7 @@ class MainActivity:ComponentActivity(){
     cloudSync = cloudSync,
     isPremium = isPremium,
     onPremiumChanged = { v -> isPremium = v; premiumSetupRequired = premiumBilling.isPremiumSetupRequired() },
-    onAccountChanged = { scope.launch { if (SupabaseClientProvider.isConfigured) { runCatching { isPremium = supabaseRepo.isPremiumForCurrentAccount() } } } },
+    onAccountChanged = { onPasswordRecoveryCompleted(); scope.launch { if (SupabaseClientProvider.isConfigured) { runCatching { isPremium = supabaseRepo.isPremiumForCurrentAccount() } } } },
     onCloudDataChanged = { refreshData() },
     authRefreshVersion = authRefreshVersion,
     passwordRecovery = passwordRecovery
