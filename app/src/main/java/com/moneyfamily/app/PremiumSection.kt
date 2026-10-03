@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 fun PremiumSection(
     billing: PremiumBilling,
     supabaseRepo: SupabaseRepository,
+    cloudSync: CloudSyncRepository,
     isPremium: Boolean,
     onPremiumChanged: (Boolean) -> Unit,
     onAccountChanged: () -> Unit,
@@ -31,6 +32,8 @@ fun PremiumSection(
     var inputEmail by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var refreshKey by remember { mutableIntStateOf(0) }
+    var cloudBusy by remember { mutableStateOf(false) }
+    var cloudMessage by remember { mutableStateOf<String?>(null) }
 
     val setupRequired = billing.isPremiumSetupRequired()
 
@@ -161,6 +164,38 @@ fun PremiumSection(
 
                     if (isPremium) {
                         Text("Premium attivo per questo account.", color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "I dati restano sul dispositivo e vengono inviati al Cloud solo quando lo richiedi.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Button(
+                            enabled = !cloudBusy && SupabaseClientProvider.isConfigured && email != null,
+                            onClick = {
+                                scope.launch {
+                                    cloudBusy = true
+                                    cloudMessage = null
+                                    cloudSync.sync()
+                                        .onSuccess {
+                                            cloudMessage = "Dati salvati sul Cloud correttamente."
+                                        }
+                                        .onFailure {
+                                            cloudMessage = "Salvataggio Cloud non riuscito: " + (it.message ?: "errore")
+                                        }
+                                    cloudBusy = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(if (cloudBusy) "Salvataggio in corso…" else "☁️ Salva dati sul Cloud")
+                        }
+                        cloudMessage?.let {
+                            Text(
+                                it,
+                                color = if (it.startsWith("Dati salvati")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 }
             }
