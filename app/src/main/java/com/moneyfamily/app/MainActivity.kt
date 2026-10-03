@@ -61,7 +61,7 @@ class MainActivity:ComponentActivity(){
  val repo=remember{RoomRepository(c)}
  val supabaseRepo=remember{SupabaseRepository()}
  val budgetStore=remember{BudgetStore(c)}
- val cloudSync=remember{CloudSyncRepository(repo,supabaseRepo,budgetStore)}
+ val cloudSync=remember{CloudSyncRepository(repo,supabaseRepo,budgetStore,c)}
  val scope=rememberCoroutineScope()
  var data by remember{mutableStateOf<List<UiMovement>>(emptyList())}
  var types by remember{mutableStateOf<List<TypeEntity>>(emptyList())}
