@@ -44,7 +44,7 @@ class CloudSyncRepository(
             CloudTypologyDto(id, familyId, local.name, local.active)
         }
         if (typePayloads.isNotEmpty()) {
-            supabase.client.from("typologies").upsert(typePayloads)
+            supabase.client.from("typologies").upsert(typePayloads, defaultToNull = false)
         }
 
         val categoryIds = mutableMapOf<String, String>()
@@ -55,7 +55,7 @@ class CloudSyncRepository(
             CloudCategoryDto(id, familyId, local.name, local.active)
         }
         if (categoryPayloads.isNotEmpty()) {
-            supabase.client.from("categories").upsert(categoryPayloads)
+            supabase.client.from("categories").upsert(categoryPayloads, defaultToNull = false)
         }
 
         // A logged-in account is not a household member. Household members are
@@ -377,7 +377,7 @@ private data class CloudTypologyDto(
     val id: String,
     @SerialName("family_id") val familyId: String,
     val name: String,
-    val active: Boolean = true
+    val active: Boolean
 )
 
 @Serializable
@@ -385,7 +385,7 @@ private data class CloudCategoryDto(
     val id: String,
     @SerialName("family_id") val familyId: String,
     val name: String,
-    val active: Boolean = true
+    val active: Boolean
 )
 
 @Serializable
