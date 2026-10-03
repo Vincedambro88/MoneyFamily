@@ -83,13 +83,14 @@ class MainActivity:ComponentActivity(){
         onPremiumChanged = {
             premiumVerificationError = null
             premiumSetupRequired = false
+            // The Edge Function has already verified the Google Play purchase
+            // and activated the family entitlement. Do not immediately overwrite
+            // the successful local state with a second client-side entitlement
+            // query, which can race with RLS/session refresh.
+            isPremium = true
             scope.launch {
                 if (SupabaseClientProvider.isConfigured) {
-                    runCatching { isPremium = supabaseRepo.isPremiumForCurrentAccount() }
-                        .onFailure { isPremium = false }
                     cloudSync.sync().onSuccess { refresh() }
-                } else {
-                    isPremium = true
                 }
             }
         },
