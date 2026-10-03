@@ -11,6 +11,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.util.UUID
 
@@ -225,13 +226,29 @@ class CloudSyncRepository(
             // Read the complete account snapshot through a SECURITY DEFINER RPC.
             // The RPC returns one JSONB value containing the whole operation array,
             // so PostgREST's 1000-row response cap cannot truncate the snapshot.
-            val remoteOperationsJson = supabase.client.postgrest.rpc(
+            // PostgREST returns the JSONB RPC result as a JSON array in this
+            // environment, even though the function itself returns one JSONB value.
+            // Do not use decodeSingle(): it expects one object and fails with
+            // "Expected {, but had [" when the response is an array.
+            val rpcResponse = supabase.client.postgrest.rpc(
                 "get_account_operations",
                 buildJsonObject {
                     put("p_workspace_id", familyId)
                 }
-            ).decodeSingle<JsonElement>()
-            val remoteOperations = Json.decodeFromJsonElement<List<CloudOperationDto>>(remoteOperationsJson)
+            ).decodeList<JsonElement>()
+
+            // Accept both response shapes:
+            // 1) [{...}, {...}]  -> direct operation array
+            // 2) [[{...}, {...}]] -> one JSONB array wrapped by PostgREST
+            val remoteOperationsJson: JsonElement =
+                if (rpcResponse.size == 1 && rpcResponse.first() is JsonArray) {
+                    rpcResponse.first()
+                } else {
+                    JsonArray(rpcResponse)
+                }
+
+            val remoteOperations =
+                Json.decodeFromJsonElement<List<CloudOperationDto>>(remoteOperationsJson)
 
             // "Carica dal Cloud" is an explicit restore: the Cloud snapshot
             // becomes the local source of truth. Fetch everything first; only then
