@@ -24,8 +24,12 @@ object SupabaseClientProvider {
                 alwaysAutoRefresh = true
                 requireValidSession = true
             }
-            install(Postgrest)
-            install(Functions)
+            install(Postgrest) {
+                requireValidSession = true
+            }
+            install(Functions) {
+                requireValidSession = true
+            }
         }
     }
 
