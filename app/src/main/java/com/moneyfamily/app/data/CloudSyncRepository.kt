@@ -174,6 +174,7 @@ class CloudSyncRepository(
             }
 
             val rpcParams = Json.encodeToJsonElement(
+                ReplaceOperationsParams.serializer(),
                 ReplaceOperationsParams(
                     pFamilyId = familyId,
                     pOperations = payloads
