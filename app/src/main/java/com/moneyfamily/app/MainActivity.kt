@@ -72,7 +72,14 @@ class MainActivity:ComponentActivity(){
  var isPremium by remember{mutableStateOf(false)}
  var premiumSetupRequired by remember{mutableStateOf(false)}
  var premiumVerificationError by remember{mutableStateOf<String?>(null)}
- fun refresh(){scope.launch{data=repo.all().map{it.ui()};types=repo.allTypes();cats=repo.allCategories();members=repo.allMembers();links=repo.allMappings()}}
+ suspend fun refreshData(){
+  data=repo.all().map{it.ui()}
+  types=repo.allTypes()
+  cats=repo.allCategories()
+  members=repo.allMembers()
+  links=repo.allMappings()
+ }
+ fun refresh(){scope.launch{refreshData()}}
  val premiumBilling=remember {
     PremiumBilling(
         c,
@@ -134,7 +141,7 @@ class MainActivity:ComponentActivity(){
     isPremium = isPremium,
     onPremiumChanged = { v -> isPremium = v; premiumSetupRequired = premiumBilling.isPremiumSetupRequired() },
     onAccountChanged = { scope.launch { if (SupabaseClientProvider.isConfigured) { runCatching { isPremium = supabaseRepo.isPremiumForCurrentAccount() } } } },
-    onCloudDataChanged = { refresh() },
+    onCloudDataChanged = { refreshData() },
     authRefreshVersion = authRefreshVersion
 )}}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
 }
