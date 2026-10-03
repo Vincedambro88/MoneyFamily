@@ -150,87 +150,25 @@ class CloudSyncRepository(
                 continue
             }
 
-            supabase.client.from("operations").upsert(
-                CloudOperationDto(
-                    id = tombstone.cloudId,
-                    familyId = familyId,
-                    amount = 0.0,
-                    description = "",
-                    operationDate = "1970-01-01",
-                    paymentMethod = "",
-                    createdBy = supabase.currentUserId(),
-                    updatedAt = tombstone.deletedAt,
-                    deletedAt = tombstone.deletedAt
-                )
-            )
-            room.removeTombstone(tombstone.cloudId)
-        }
-
-        local.forEach { movement ->
-            val cloudId = movement.cloudId ?: UUID.nameUUIDFromBytes(
-                (familyId + ":operation:" + movement.id).toByteArray()
-            ).toString()
-            val remote = remoteById[cloudId]
-
-            if (remote != null && remote.deletedAt != null) {
-                if (!movement.updatedAt.isAfterTimestamp(remote.updatedAt)) {
-                    room.deleteByCloudId(cloudId)
-                    return@forEach
-                }
-            }
-
-            if (remote != null && remote.updatedAt.isAfterTimestamp(movement.updatedAt)) {
-                val typeName = remoteTypes.firstOrNull { it.id == remote.typologyId }?.name.orEmpty()
-                val category = remoteCategories.firstOrNull { it.id == remote.categoryId }?.name.orEmpty()
-                val member = remoteMembers.firstOrNull { it.id == remote.memberId }?.displayName.orEmpty()
-                if (remote.deletedAt != null) {
-                    room.deleteByCloudId(cloudId)
-                } else {
-                    room.updateCloud(
-                        Movement(
-                            id = movement.id,
-                            type = if (remote.amount >= 0) MovementType.INCOME else MovementType.EXPENSE,
-                            amount = remote.amount,
-                            category = category,
-                            description = remote.description,
-                            date = remote.operationDate.fromSupabaseDate(),
-                            member = member,
-                            paymentMethod = remote.paymentMethod,
-                            typeName = typeName
-                        ),
-                        cloudId,
-                        remote.updatedAt
-                    )
-                }
-                return@forEach
-            }
-
-            val typologyId = remoteTypes.firstOrNull { it.name.equals(movement.typeName, true) }?.id
-            val categoryId = remoteCategories.firstOrNull { it.name.equals(movement.category, true) }?.id
-            val memberId = remoteMembers.firstOrNull { it.displayName.equals(movement.member, true) }?.id
-            val timestamp = if (movement.updatedAt.isAfterTimestamp("2000-01-01T00:00:00Z")) {
-                movement.updatedAt
-            } else {
-                java.time.Instant.now().toString()
-            }
-
-            supabase.client.from("operations").upsert(
-                CloudOperationDto(
-                    id = cloudId,
-                    familyId = familyId,
-                    typologyId = typologyId,
-                    categoryId = categoryId,
-                    memberId = memberId,
-                    amount = movement.amount,
-                    description = movement.description,
-                    operationDate = movement.date.toSupabaseDate(),
-                    paymentMethod = movement.paymentMethod,
-                    createdBy = supabase.currentUserId(),
-                    updatedAt = timestamp,
-                    deletedAt = null
-                )
+            pendingOperations += CloudOperationDto(
+                id = cloudId,
+                familyId = familyId,
+                typologyId = typologyId,
+                categoryId = categoryId,
+                memberId = memberId,
+                amount = movement.amount,
+                description = movement.description,
+                operationDate = movement.date.toSupabaseDate(),
+                paymentMethod = movement.paymentMethod,
+                createdBy = supabase.currentUserId(),
+                updatedAt = timestamp,
+                deletedAt = null
             )
             room.setCloudId(movement.id, cloudId, timestamp)
+        }
+
+        pendingOperations.chunked(100).forEach { chunk ->
+            supabase.client.from("operations").upsert(chunk)
         }
 
         val remoteOperations = supabase.client.from("operations").select {
