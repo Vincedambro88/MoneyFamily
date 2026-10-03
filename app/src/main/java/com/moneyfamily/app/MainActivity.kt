@@ -49,11 +49,14 @@ private val mf = SimpleDateFormat("MMMM yyyy", Locale.ITALIAN)
 data class UiMovement(val id:Long,val type:MovementType,val amount:Double,val category:String,val description:String,val date:String,val member:String,val typeName:String = "")
 class MainActivity:ComponentActivity(){
  private var authRefreshVersion by mutableIntStateOf(0)
- override fun onCreate(s:Bundle?){super.onCreate(s);runCatching { if (SupabaseClientProvider.isConfigured) SupabaseClientProvider.client.handleDeeplinks(intent) };setContent{MoneyFamilyApp(authRefreshVersion)}}
- override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);runCatching { if (SupabaseClientProvider.isConfigured) SupabaseClientProvider.client.handleDeeplinks(intent) };authRefreshVersion++}
+ private var passwordRecovery by mutableStateOf(false)
+ private fun isPasswordRecoveryIntent(intent: Intent): Boolean =
+  intent.data?.scheme == "moneyfamily" && intent.data?.host == "auth-callback"
+ override fun onCreate(s:Bundle?){super.onCreate(s);passwordRecovery=isPasswordRecoveryIntent(intent);runCatching { if (SupabaseClientProvider.isConfigured) SupabaseClientProvider.client.handleDeeplinks(intent) };setContent{MoneyFamilyApp(authRefreshVersion,passwordRecovery)}}
+ override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);passwordRecovery=isPasswordRecoveryIntent(intent);runCatching { if (SupabaseClientProvider.isConfigured) SupabaseClientProvider.client.handleDeeplinks(intent) };authRefreshVersion++}
 }
 
-@Composable private fun MoneyFamilyApp(authRefreshVersion:Int=0){
+@Composable private fun MoneyFamilyApp(authRefreshVersion:Int=0,passwordRecovery:Boolean=false){
  val c=LocalContext.current
  val repo=remember{RoomRepository(c)}
  val supabaseRepo=remember{SupabaseRepository()}
@@ -552,7 +555,9 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
 }
 
 
-@Composable private fun CloudAccountCard(repo:SupabaseRepository,isPremium:Boolean){
+@Composable private fun CloudAccountCard(
+ repo:SupabaseRepository,isPremium:Boolean,passwordRecovery:Boolean=false
+){
  val scope=rememberCoroutineScope()
  var email by remember{mutableStateOf<String?>(null)}
  var familyName by remember{mutableStateOf<String?>(null)}
@@ -560,38 +565,133 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
  var members by remember{mutableStateOf<List<SupabaseFamilyMemberDto>>(emptyList())}
  var busy by remember{mutableStateOf(false)}
  var error by remember{mutableStateOf<String?>(null)}
- var mode by remember{mutableStateOf("login")}
+ var mode by remember(passwordRecovery){mutableStateOf(if(passwordRecovery)"reset" else "login")}
  var inputEmail by remember{mutableStateOf("")}
  var password by remember{mutableStateOf("")}
+ var confirmPassword by remember{mutableStateOf("")}
  var familyInput by remember{mutableStateOf("")}
  var showCreateFamily by remember{mutableStateOf(false)}
+ var resetSent by remember{mutableStateOf(false)}
  var refresh by remember{mutableStateOf(0)}
+
  fun load(){
-  scope.launch{busy=true;error=null;runCatching{email=repo.currentUserEmail();val families=repo.familiesForCurrentUser();val family=families.firstOrNull();familyId=family?.id;familyName=family?.name;members=family?.let{repo.familyMembers(it.id)}?:emptyList()}.onFailure{error=it.message?:"Errore di connessione"};busy=false}
+  scope.launch{
+   busy=true;error=null
+   runCatching{
+    email=repo.currentUserEmail()
+    val families=repo.familiesForCurrentUser()
+    val family=families.firstOrNull()
+    familyId=family?.id
+    familyName=family?.name
+    members=family?.let{repo.familyMembers(it.id)}?:emptyList()
+   }.onFailure{error=it.message?: "Errore di connessione"}
+   busy=false
+  }
  }
- LaunchedEffect(refresh){if(SupabaseClientProvider.isConfigured)load()}
+ LaunchedEffect(refresh,passwordRecovery){if(SupabaseClientProvider.isConfigured)load()}
+
  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
   Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
    Text("Account e famiglia",style=MaterialTheme.typography.titleLarge)
-   if(!SupabaseClientProvider.isConfigured){Text("Cloud non configurato su questo dispositivo. Funzionamento locale invariato.")}
-   else if(email==null){
+   if(!SupabaseClientProvider.isConfigured){
+    Text("Cloud non configurato su questo dispositivo. Funzionamento locale invariato.")
+   }else if(passwordRecovery){
+    Text("Reimposta la password",style=MaterialTheme.typography.titleMedium)
+    Text("Inserisci la nuova password per completare il recupero dell'account.")
+    OutlinedTextField(
+     value=password,onValueChange={password=it},
+     label={Text("Nuova password")},singleLine=true,
+     modifier=Modifier.fillMaxWidth()
+    )
+    OutlinedTextField(
+     value=confirmPassword,onValueChange={confirmPassword=it},
+     label={Text("Conferma nuova password")},singleLine=true,
+     modifier=Modifier.fillMaxWidth()
+    )
+    if(password.isNotBlank()&&password.length<6)Text("La password deve contenere almeno 6 caratteri.",color=NegativeColor,style=MaterialTheme.typography.bodySmall)
+    if(confirmPassword.isNotBlank()&&confirmPassword!=password)Text("Le password non coincidono.",color=NegativeColor,style=MaterialTheme.typography.bodySmall)
+    Button(
+     enabled=!busy&&password.length>=6&&password==confirmPassword,
+     onClick={scope.launch{
+      busy=true;error=null
+      runCatching{repo.updatePassword(password)}
+       .onSuccess{
+        password="";confirmPassword="";resetSent=false
+        mode="login"
+       }
+       .onFailure{error=it.message?:"Impossibile aggiornare la password."}
+      busy=false
+     }},
+     modifier=Modifier.fillMaxWidth()
+    ){Text(if(busy)"Attendere…" else "Aggiorna password")}
+    TextButton(onClick={passwordRecovery=false},modifier=Modifier.fillMaxWidth()){Text("Annulla")}
+   }else if(email==null){
     Text("Accedi allo stesso account su più dispositivi per condividere la stessa famiglia.")
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){FilterChip(selected=mode=="login",onClick={mode="login"},label={Text("Accedi")},modifier=Modifier.weight(1f));FilterChip(selected=mode=="signup",onClick={mode="signup"},label={Text("Registrati")},modifier=Modifier.weight(1f))}
-    OutlinedTextField(value=inputEmail,onValueChange={inputEmail=it},label={Text("Email")},singleLine=true,modifier=Modifier.fillMaxWidth())
-    OutlinedTextField(value=password,onValueChange={password=it},label={Text("Password")},singleLine=true,modifier=Modifier.fillMaxWidth())
-    Button(enabled=!busy&&inputEmail.isNotBlank()&&password.length>=6,onClick={scope.launch{busy=true;error=null;runCatching{if(mode=="login")repo.signIn(inputEmail,password)else repo.signUp(inputEmail,password);inputEmail="";password=""}.onFailure{error=it.message?:"Operazione non riuscita"};busy=false;refresh++}},modifier=Modifier.fillMaxWidth()){Text(if(busy)"Attendere…"else if(mode=="login")"Accedi"else"Crea account")}
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+     FilterChip(selected=mode=="login",onClick={mode="login";error=null;resetSent=false},label={Text("Accedi")},modifier=Modifier.weight(1f))
+     FilterChip(selected=mode=="signup",onClick={mode="signup";error=null;resetSent=false},label={Text("Registrati")},modifier=Modifier.weight(1f))
+    }
+    if(mode=="reset"){
+     Text("Recupera password",style=MaterialTheme.typography.titleMedium)
+     Text("Inserisci la tua email per ricevere il link per reimpostare la password.")
+     OutlinedTextField(value=inputEmail,onValueChange={inputEmail=it},label={Text("Email")},singleLine=true,modifier=Modifier.fillMaxWidth())
+     Button(
+      enabled=!busy&&inputEmail.isNotBlank(),
+      onClick={scope.launch{
+       busy=true;error=null;resetSent=false
+       runCatching{repo.sendPasswordReset(inputEmail)}
+        .onSuccess{resetSent=true}
+        .onFailure{error=it.message?:"Impossibile inviare il link di recupero."}
+       busy=false
+      }},
+      modifier=Modifier.fillMaxWidth()
+     ){Text(if(busy)"Attendere…" else "Invia link di recupero")}
+     if(resetSent)Text("Se l'indirizzo è associato a un account, riceverai le istruzioni per impostare una nuova password.",color=PositiveColor,style=MaterialTheme.typography.bodySmall)
+     TextButton(onClick={mode="login";error=null;resetSent=false},modifier=Modifier.fillMaxWidth()){Text("Torna ad Accedi")}
+    }else{
+     OutlinedTextField(value=inputEmail,onValueChange={inputEmail=it},label={Text("Email")},singleLine=true,modifier=Modifier.fillMaxWidth())
+     OutlinedTextField(value=password,onValueChange={password=it},label={Text("Password")},singleLine=true,modifier=Modifier.fillMaxWidth())
+     Button(
+      enabled=!busy&&inputEmail.isNotBlank()&&password.length>=6,
+      onClick={scope.launch{
+       busy=true;error=null
+       runCatching{if(mode=="login")repo.signIn(inputEmail,password)else repo.signUp(inputEmail,password);inputEmail="";password=""}
+        .onFailure{error=it.message?:"Operazione non riuscita"}
+       busy=false;refresh++
+      }},
+      modifier=Modifier.fillMaxWidth()
+     ){Text(if(busy)"Attendere…" else if(mode=="login")"Accedi" else "Crea account")}
+     if(mode=="login")TextButton(onClick={mode="reset";error=null;resetSent=false},modifier=Modifier.fillMaxWidth()){Text("Password dimenticata?")}
+    }
    }else{
     Text("Account: "+email,style=MaterialTheme.typography.bodyLarge)
     if(familyId==null){
      Text("Nessuna famiglia associata a questo account.")
-     if(showCreateFamily){OutlinedTextField(value=familyInput,onValueChange={familyInput=it},label={Text("Nome famiglia")},singleLine=true,modifier=Modifier.fillMaxWidth());Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton(onClick={showCreateFamily=false},modifier=Modifier.weight(1f)){Text("Annulla")};Button(enabled=!busy&&familyInput.isNotBlank(),onClick={scope.launch{busy=true;error=null;runCatching{repo.createFamily(familyInput)}.onSuccess{familyInput="";showCreateFamily=false}.onFailure{error=it.message?:"Creazione famiglia non riuscita"};busy=false;refresh++}},modifier=Modifier.weight(1f)){Text("Crea")}}}else Button(onClick={showCreateFamily=true},modifier=Modifier.fillMaxWidth()){Text("+ Crea famiglia")}
-    }else{Text("Famiglia: "+(familyName?:""),style=MaterialTheme.typography.bodyLarge);Text("Membri: "+members.size);members.forEach{Text("• "+it.displayName+" ("+it.role+")",style=MaterialTheme.typography.bodyMedium)};if(isPremium)Text("Premium: condiviso a livello famiglia",color=PositiveColor,style=MaterialTheme.typography.labelLarge);Text("Usa lo stesso account sugli altri dispositivi per accedere agli stessi dati della famiglia.",style=MaterialTheme.typography.bodySmall)}
+     if(showCreateFamily){
+      OutlinedTextField(value=familyInput,onValueChange={familyInput=it},label={Text("Nome famiglia")},singleLine=true,modifier=Modifier.fillMaxWidth())
+      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+       OutlinedButton(onClick={showCreateFamily=false},modifier=Modifier.weight(1f)){Text("Annulla")}
+       Button(enabled=!busy&&familyInput.isNotBlank(),onClick={scope.launch{
+        busy=true;error=null
+        runCatching{repo.createFamily(familyInput)}.onSuccess{familyInput="";showCreateFamily=false}.onFailure{error=it.message?:"Creazione famiglia non riuscita"}
+        busy=false;refresh++
+       }},modifier=Modifier.weight(1f)){Text("Crea")}
+      }
+     }else Button(onClick={showCreateFamily=true},modifier=Modifier.fillMaxWidth()){Text("+ Crea famiglia")}
+    }else{
+     Text("Famiglia: "+(familyName?:""),style=MaterialTheme.typography.bodyLarge)
+     Text("Membri: "+members.size)
+     members.forEach{Text("• "+it.displayName+" ("+it.role+")",style=MaterialTheme.typography.bodyMedium)}
+     if(isPremium)Text("Premium: condiviso a livello famiglia",color=PositiveColor,style=MaterialTheme.typography.labelLarge)
+     Text("Usa lo stesso account sugli altri dispositivi per accedere agli stessi dati della famiglia.",style=MaterialTheme.typography.bodySmall)
+    }
     OutlinedButton(onClick={scope.launch{try{repo.signOutCurrentDevice();refresh++}catch(t:Throwable){error=t.message}}},modifier=Modifier.fillMaxWidth()){Text("Esci da questo dispositivo")}
    }
    error?.let{Text(it,color=NegativeColor,style=MaterialTheme.typography.bodySmall)}
   }
  }
 }
+
 @Composable private fun PremiumCard(billing:PremiumBilling,isPremium:Boolean){
  val context=LocalContext.current
  Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
