@@ -13,7 +13,8 @@ data class SupabaseProfileDto(
 data class SupabaseFamilyDto(
     val id: String,
     val name: String,
-    @SerialName("created_by") val createdBy: String
+    @SerialName("created_by") val createdBy: String,
+    @SerialName("created_at") val createdAt: String? = null
 )
 
 @Serializable
