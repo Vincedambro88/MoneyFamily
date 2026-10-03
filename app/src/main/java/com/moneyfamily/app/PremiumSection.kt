@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.moneyfamily.app.data.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 @Composable
 fun PremiumSection(
@@ -175,14 +176,25 @@ fun PremiumSection(
                                 scope.launch {
                                     cloudBusy = true
                                     cloudMessage = null
-                                    cloudSync.sync()
-                                        .onSuccess {
-                                            cloudMessage = "Dati salvati sul Cloud correttamente."
+                                    try {
+                                        withTimeout(30_000L) {
+                                            cloudSync.sync()
+                                                .onSuccess {
+                                                    cloudMessage = "Dati salvati sul Cloud correttamente."
+                                                }
+                                                .onFailure {
+                                                    cloudMessage = "Salvataggio Cloud non riuscito: " + (it.message ?: "errore")
+                                                }
                                         }
-                                        .onFailure {
-                                            cloudMessage = "Salvataggio Cloud non riuscito: " + (it.message ?: "errore")
+                                    } catch (t: Throwable) {
+                                        cloudMessage = if (t is kotlinx.coroutines.TimeoutCancellationException) {
+                                            "Salvataggio Cloud non riuscito: timeout dopo 30 secondi."
+                                        } else {
+                                            "Salvataggio Cloud non riuscito: " + (t.message ?: "errore")
                                         }
-                                    cloudBusy = false
+                                    } finally {
+                                        cloudBusy = false
+                                    }
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
