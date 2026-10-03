@@ -48,20 +48,26 @@ class RoomRepository(private val context: Context) {
     }
 
     suspend fun allTypes(): List<TypeEntity> { seedDefaults(); return types.active() }
+    suspend fun allTypesIncludingInactive(): List<TypeEntity> { seedDefaults(); return types.all() }
     suspend fun activeTypes(): List<TypeEntity> { seedDefaults(); return types.active() }
     suspend fun addType(name: String) = types.insert(TypeEntity(name = name.trim()))
     suspend fun updateType(item: TypeEntity) = types.update(item)
     suspend fun setTypeActive(id: Long, active: Boolean) = types.setActive(id, active)
 
     suspend fun allCategories(): List<CategoryEntity> { seedDefaults(); return categories.active() }
+    suspend fun allCategoriesIncludingInactive(): List<CategoryEntity> { seedDefaults(); return categories.all() }
     suspend fun activeCategories(): List<CategoryEntity> { seedDefaults(); return categories.active() }
     suspend fun addCategory(name: String) = categories.insert(CategoryEntity(name = name.trim()))
     suspend fun updateCategory(item: CategoryEntity) = categories.update(item)
     suspend fun setCategoryActive(id: Long, active: Boolean) = categories.setActive(id, active)
 
     suspend fun allMembers(): List<FamilyMemberEntity> { seedDefaults(); return members.active() }
+    suspend fun allMembersIncludingInactive(): List<FamilyMemberEntity> { seedDefaults(); return members.all() }
     suspend fun activeMembers(): List<FamilyMemberEntity> { seedDefaults(); return members.active() }
     suspend fun addMember(name: String) = members.insert(FamilyMemberEntity(name = name.trim()))
+    suspend fun removeMemberByName(name: String) = db.withTransaction {
+        members.all().filter { it.name.equals(name, true) }.forEach { members.setActive(it.id, false) }
+    }
     suspend fun updateMember(item: FamilyMemberEntity) = members.update(item)
     suspend fun setMemberActive(id: Long, active: Boolean) = members.setActive(id, active)
 
