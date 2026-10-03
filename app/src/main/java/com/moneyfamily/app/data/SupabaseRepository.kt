@@ -79,7 +79,7 @@ class SupabaseRepository(
 
     suspend fun sendPasswordReset(email: String) = withContext(Dispatchers.IO) {
         try {
-            client.auth.resetPasswordForEmail(email.trim())
+            client.auth.resetPasswordForEmail(\n                email.trim(),\n                SupabaseClientProvider.AUTH_REDIRECT_URL\n            )
         } catch (t: Throwable) {
             throw IllegalStateException(
                 t.message ?: "Impossibile inviare il link per il recupero della password.",
