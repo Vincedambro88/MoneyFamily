@@ -9,6 +9,8 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -128,3 +130,8 @@ class SupabaseRepository(
         error(backendError ?: "Verifica Premium non completata.")
     }
 }
+
+@Serializable
+private data class AccountFamilyIdDto(
+    @SerialName("family_id") val familyId: String
+)
