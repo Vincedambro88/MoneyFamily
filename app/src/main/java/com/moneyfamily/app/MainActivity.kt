@@ -565,6 +565,7 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
  var members by remember{mutableStateOf<List<SupabaseFamilyMemberDto>>(emptyList())}
  var busy by remember{mutableStateOf(false)}
  var error by remember{mutableStateOf<String?>(null)}
+ var recoveryActive by remember(passwordRecovery){mutableStateOf(passwordRecovery)}
  var mode by remember(passwordRecovery){mutableStateOf(if(passwordRecovery)"reset" else "login")}
  var inputEmail by remember{mutableStateOf("")}
  var password by remember{mutableStateOf("")}
@@ -595,7 +596,7 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
    Text("Account e famiglia",style=MaterialTheme.typography.titleLarge)
    if(!SupabaseClientProvider.isConfigured){
     Text("Cloud non configurato su questo dispositivo. Funzionamento locale invariato.")
-   }else if(passwordRecovery){
+   }else if(recoveryActive){
     Text("Reimposta la password",style=MaterialTheme.typography.titleMedium)
     Text("Inserisci la nuova password per completare il recupero dell'account.")
     OutlinedTextField(
@@ -617,6 +618,7 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
       runCatching{repo.updatePassword(password)}
        .onSuccess{
         password="";confirmPassword="";resetSent=false
+        recoveryActive=false
         mode="login"
        }
        .onFailure{error=it.message?:"Impossibile aggiornare la password."}
@@ -624,7 +626,7 @@ private fun UiMovement.model()=Movement(id,type,amount,category,description,date
      }},
      modifier=Modifier.fillMaxWidth()
     ){Text(if(busy)"Attendere…" else "Aggiorna password")}
-    TextButton(onClick={passwordRecovery=false},modifier=Modifier.fillMaxWidth()){Text("Annulla")}
+    TextButton(onClick={recoveryActive=false;mode="login";error=null},modifier=Modifier.fillMaxWidth()){Text("Annulla")}
    }else if(email==null){
     Text("Accedi allo stesso account su più dispositivi per condividere la stessa famiglia.")
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
