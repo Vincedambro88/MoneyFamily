@@ -145,7 +145,8 @@ class MainActivity:ComponentActivity(){
     onPremiumChanged = { v -> isPremium = v; premiumSetupRequired = premiumBilling.isPremiumSetupRequired() },
     onAccountChanged = { scope.launch { if (SupabaseClientProvider.isConfigured) { runCatching { isPremium = supabaseRepo.isPremiumForCurrentAccount() } } } },
     onCloudDataChanged = { refreshData() },
-    authRefreshVersion = authRefreshVersion
+    authRefreshVersion = authRefreshVersion,
+    passwordRecovery = passwordRecovery
 )}}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
 }
 
