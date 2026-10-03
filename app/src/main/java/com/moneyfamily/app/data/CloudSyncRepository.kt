@@ -131,8 +131,7 @@ class CloudSyncRepository(
         runCatching {
             if (!SupabaseClientProvider.isConfigured) error("Cloud non configurato.")
             val currentUserId = supabase.currentUserId() ?: error("Account MoneyFamily non autenticato.")
-            val familyId = supabase.familiesForCurrentUser().firstOrNull()?.id
-                ?: supabase.createFamily("MoneyFamily Account")
+            val familyId = supabase.ensureAccountWorkspace()
 
             syncReferenceData(familyId)
 
@@ -208,8 +207,7 @@ class CloudSyncRepository(
         runCatching {
             if (!SupabaseClientProvider.isConfigured) error("Cloud non configurato.")
             if (supabase.currentUserId() == null) error("Account MoneyFamily non autenticato.")
-            val familyId = supabase.familiesForCurrentUser().firstOrNull()?.id
-                ?: error("Nessun workspace Cloud associato all'account.")
+            val familyId = supabase.ensureAccountWorkspace()
 
             syncReferenceData(familyId)
 
