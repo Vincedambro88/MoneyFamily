@@ -266,41 +266,43 @@ fun PremiumSection(
                     if (!SupabaseClientProvider.isConfigured) {
                         Text("Cloud non configurato su questo dispositivo. Il funzionamento locale della versione Free resta invariato.")
                     } else if (email == null || recoveryActive) {
-                        if (setupRequired) {
-                            Text(
-                                "Il pagamento Google Play è stato rilevato. Per sbloccare Premium devi accedere o creare un account MoneyFamily."
-                            )
-                        } else {
-                            Text(
-                                "L'account non è richiesto per la versione Free. Puoi crearlo qui per preparare l'accesso Cloud e multi-dispositivo."
+                        if (!recoveryActive) {
+                            if (setupRequired) {
+                                Text(
+                                    "Il pagamento Google Play è stato rilevato. Per sbloccare Premium devi accedere o creare un account MoneyFamily."
+                                )
+                            } else {
+                                Text(
+                                    "L'account non è richiesto per la versione Free. Puoi crearlo qui per preparare l'accesso Cloud e multi-dispositivo."
+                                )
+                            }
+
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                FilterChip(
+                                    selected = mode == "login",
+                                    onClick = { mode = "login" },
+                                    label = { Text("Accedi") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FilterChip(
+                                    selected = mode == "signup",
+                                    onClick = { mode = "signup" },
+                                    label = { Text("Crea account") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = inputEmail,
+                                onValueChange = { inputEmail = it },
+                                label = { Text("Email") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
-
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            FilterChip(
-                                selected = mode == "login",
-                                onClick = { mode = "login" },
-                                label = { Text("Accedi") },
-                                modifier = Modifier.weight(1f)
-                            )
-                            FilterChip(
-                                selected = mode == "signup",
-                                onClick = { mode = "signup" },
-                                label = { Text("Crea account") },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-
-                        OutlinedTextField(
-                            value = inputEmail,
-                            onValueChange = { inputEmail = it },
-                            label = { Text("Email") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
                         if (recoveryActive) {
                             Text("Reimposta la password", style = MaterialTheme.typography.titleMedium)
                             Text("Inserisci la nuova password per completare il recupero dell'account.")
