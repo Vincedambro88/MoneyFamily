@@ -111,6 +111,9 @@ class MainActivity:ComponentActivity(){
         }
     )
 }
+ LaunchedEffect(passwordRecovery){
+  if(passwordRecovery) tab = 5
+ }
  LaunchedEffect(Unit, authRefreshVersion){
   premiumSetupRequired=premiumBilling.isPremiumSetupRequired()
   isPremium=premiumBilling.isPremium()
