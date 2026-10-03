@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 object ExcelExporter {
     fun write(context: Context, uri: Uri, rows: List<UiMovement>) {
@@ -15,7 +17,7 @@ object ExcelExporter {
                 put(zip, "xl/_rels/workbook.xml.rels", """<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>""")
                 val table = buildList {
                     add(listOf("Data", "Importo", "Tipologia", "Categoria", "Componente", "Descrizione"))
-                    rows.sortedBy { parse(it.date)?.timeInMillis ?: Long.MAX_VALUE }.forEach {
+                    rows.sortedBy { runCatching { SimpleDateFormat("dd/MM/yyyy", Locale.ITALY).parse(it.date)?.time ?: Long.MAX_VALUE }.getOrDefault(Long.MAX_VALUE) }.forEach {
                         add(listOf(it.date, it.amount.toString().replace(".", ","), it.typeName, it.category, it.member, it.description))
                     }
                 }
