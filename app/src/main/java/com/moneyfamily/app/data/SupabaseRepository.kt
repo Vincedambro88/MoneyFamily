@@ -86,7 +86,8 @@ class SupabaseRepository(
         client.auth.currentUserOrNull()?.id
             ?: error("Devi effettuare l'accesso all'account MoneyFamily.")
         client.postgrest.rpc("get_account_family_id")
-            .decodeSingleOrNull<String>()
+            .decodeSingleOrNull<AccountFamilyIdDto>()
+            ?.familyId
             ?: createFamily("MoneyFamily Account")
     }
 
