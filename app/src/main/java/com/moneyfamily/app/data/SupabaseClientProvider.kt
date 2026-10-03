@@ -7,6 +7,8 @@ import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.FlowType
 import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.annotations.SupabaseExperimental
+@OptIn(SupabaseExperimental::class)
 object SupabaseClientProvider {
     const val AUTH_REDIRECT_URL = "moneyfamily://auth-callback"
     val client: SupabaseClient by lazy {
@@ -20,6 +22,7 @@ object SupabaseClientProvider {
                 scheme = "moneyfamily"
                 autoLoadFromStorage = true
                 alwaysAutoRefresh = true
+                requireValidSession = true
             }
             install(Postgrest)
             install(Functions)
