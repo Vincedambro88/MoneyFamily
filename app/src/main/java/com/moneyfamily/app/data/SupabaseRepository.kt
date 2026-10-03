@@ -65,6 +65,7 @@ class SupabaseRepository(
 
     suspend fun familiesForCurrentUser(): List<SupabaseFamilyDto> = withContext(Dispatchers.IO) {
         client.from("families").select().decodeList<SupabaseFamilyDto>()
+            .sortedBy { it.createdAt ?: "9999-12-31T23:59:59Z" }
     }
 
     suspend fun familyMembers(familyId: String): List<SupabaseFamilyMemberDto> =
