@@ -8,7 +8,9 @@ import io.github.jan.supabase.auth.FlowType
 import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.util.InternalAPI
 
+@OptIn(InternalAPI::class)
 object SupabaseClientProvider {
     const val AUTH_REDIRECT_URL = "moneyfamily://auth-callback"
     val client: SupabaseClient by lazy {
@@ -17,8 +19,6 @@ object SupabaseClientProvider {
             supabaseKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
         ) {
             install(Auth) {
-                // Native Android authentication uses PKCE so confirmation/deep-link
-                // callbacks can be exchanged securely for a persistent session.
                 flowType = FlowType.PKCE
                 host = "auth-callback"
                 scheme = "moneyfamily"
