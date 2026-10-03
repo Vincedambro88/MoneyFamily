@@ -7,10 +7,6 @@ import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.FlowType
 import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.util.InternalAPI
-
-@OptIn(InternalAPI::class)
 object SupabaseClientProvider {
     const val AUTH_REDIRECT_URL = "moneyfamily://auth-callback"
     val client: SupabaseClient by lazy {
@@ -27,11 +23,6 @@ object SupabaseClientProvider {
             }
             install(Postgrest)
             install(Functions)
-            httpConfig {
-                install(HttpTimeout) {
-                    requestTimeoutMillis = 30000L
-                }
-            }
         }
     }
 
