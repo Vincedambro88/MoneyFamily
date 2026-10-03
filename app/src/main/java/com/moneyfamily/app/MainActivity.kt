@@ -88,11 +88,7 @@ class MainActivity:ComponentActivity(){
             // the successful local state with a second client-side entitlement
             // query, which can race with RLS/session refresh.
             isPremium = true
-            scope.launch {
-                if (SupabaseClientProvider.isConfigured) {
-                    cloudSync.sync().onSuccess { refresh() }
-                }
-            }
+
         },
         onPurchaseDetected = {
             premiumSetupRequired = true
@@ -114,16 +110,14 @@ class MainActivity:ComponentActivity(){
       runCatching { supabaseRepo.isPremiumForCurrentAccount() }
         .onSuccess { remotePremium ->
           isPremium = remotePremium
-          if(remotePremium){
-            cloudSync.sync().onSuccess { refresh() }
-          }
+
         }
     }
   }
 }
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
- fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh();cloudSync.sync().onSuccess { refresh() }}}
- fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh();cloudSync.sync().onSuccess { refresh() }}}
+ fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh()}}
+ fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh()}}
  MaterialTheme{Scaffold(bottomBar={NavigationBar{listOf("Dashboard","Operazioni","Inserisci","Impostazioni","Budget","Premium").forEachIndexed{i,t->NavigationBarItem(selected=tab==i,onClick={tab=i;if(i==5)premiumBilling.connect()},icon={
  when(i){
   0->Icon(Icons.Outlined.Dashboard,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF2563EB))
@@ -133,7 +127,7 @@ class MainActivity:ComponentActivity(){
   4->Icon(Icons.Outlined.AccountBalanceWallet,contentDescription=t,tint=androidx.compose.ui.graphics.Color(0xFF0891B2))
   else->Icon(painterResource(R.drawable.ic_premium),contentDescription=t,tint=androidx.compose.ui.graphics.Color.Unspecified)
  }
-},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh();cloudSync.sync().onSuccess { refresh() }}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()});4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium);5->Column(Modifier.fillMaxSize()){premiumVerificationError?.let{msg->Text("Errore verifica Premium: $msg",color=NegativeColor,modifier=Modifier.padding(horizontal=16.dp,vertical=8.dp))};PremiumSection(premiumBilling,supabaseRepo,isPremium,{v->isPremium=v;premiumSetupRequired=premiumBilling.isPremiumSetupRequired()},{scope.launch{if(SupabaseClientProvider.isConfigured){runCatching{isPremium=supabaseRepo.isPremiumForCurrentAccount()};cloudSync.sync().onSuccess { refresh() }}} },authRefreshVersion)}}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
+},label={Text(t)})}}}){p->Column(Modifier.fillMaxSize().padding(p)){Text("MoneyFamily",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(16.dp));when(tab){0->Dashboard(data,month,{month=shift(month,-1)},{month=shift(month,1)},{add=true},isPremium);1->Operations(data,types,cats,members,month,{month=shift(month,-1)},{month=shift(month,1)},{edit=it},{remove(it)},{period,annual->scope.launch{val selected=data.filter{if(annual) parse(it.date)?.get(Calendar.YEAR)==period.get(Calendar.YEAR) else same(it.date,period)};repo.deleteAll(selected.map{it.model()});refresh()}});2->InsertScreen(types,cats,members,links,repo,{tab=0},{save(it);tab=1},{refresh()},data);3->Configuration(types,cats,members,links,repo,{refresh()});4->BudgetScreen(types,cats,links,data,month,premiumBilling,isPremium);5->Column(Modifier.fillMaxSize()){premiumVerificationError?.let{msg->Text("Errore verifica Premium: $msg",color=NegativeColor,modifier=Modifier.padding(horizontal=16.dp,vertical=8.dp))};PremiumSection(premiumBilling,supabaseRepo,cloudSync,isPremium,{v->isPremium=v;premiumSetupRequired=premiumBilling.isPremiumSetupRequired()},{scope.launch{if(SupabaseClientProvider.isConfigured){runCatching{isPremium=supabaseRepo.isPremiumForCurrentAccount()}}}},authRefreshVersion)}}}};if(add)Editor(null,types,cats,members,links,repo,{add=false}){save(it);add=false};edit?.let{e->Editor(e,types,cats,members,links,repo,{edit=null}){save(it);edit=null}}}
 }
 
 @Composable private fun Dashboard(data:List<UiMovement>,month:Calendar,prev:()->Unit,next:()->Unit,add:()->Unit,isPremium:Boolean){
