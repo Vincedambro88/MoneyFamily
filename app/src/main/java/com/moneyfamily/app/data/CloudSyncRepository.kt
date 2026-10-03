@@ -220,22 +220,16 @@ class CloudSyncRepository(
             val remoteMembers = supabase.client.from("family_members").select {
                 filter { eq("family_id", familyId) }
             }.decodeList<CloudMemberDto>()
-            // PostgREST limits a single response to 1000 rows by default.
-            // Fetch operations in pages so every Cloud operation is restored.
-            val remoteOperations = mutableListOf<CloudOperationDto>()
-            val pageSize = 500
-            var page = 0
-            while (true) {
-                val from = page * pageSize
-                val to = from + pageSize - 1
-                val batch = supabase.client.from("operations").select {
-                    filter { eq("family_id", familyId) }
-                    range(from.toLong(), to.toLong())
-                }.decodeList<CloudOperationDto>()
-                remoteOperations += batch
-                if (batch.size < pageSize) break
-                page++
-            }
+            // Read the complete family snapshot through a dedicated
+            // SECURITY DEFINER RPC. This avoids the 1000-row PostgREST
+            // response limit and prevents an operations-table RLS mismatch
+            // from returning an empty result for an otherwise authorized user.
+            val remoteOperations = supabase.client.postgrest.rpc(
+                "get_family_operations",
+                kotlinx.serialization.json.buildJsonObject {
+                    kotlinx.serialization.json.put("p_family_id", familyId)
+                }
+            ).decodeList<CloudOperationDto>()
 
             // "Carica dal Cloud" is an explicit restore: the Cloud snapshot
             // becomes the local source of truth. Fetch everything first; only then
