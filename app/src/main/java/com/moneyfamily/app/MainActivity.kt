@@ -52,7 +52,7 @@ class MainActivity:ComponentActivity(){
  private var passwordRecovery by mutableStateOf(false)
  private fun isPasswordRecoveryIntent(intent: Intent): Boolean =
   intent.data?.scheme == "moneyfamily" && intent.data?.host == "auth-callback"
- override fun onCreate(s:Bundle?){super.onCreate(s);passwordRecovery=isPasswordRecoveryIntent(intent);runCatching { if (SupabaseClientProvider.isConfigured) SupabaseClientProvider.client.handleDeeplinks(intent) };setContent{MoneyFamilyApp(authRefreshVersion,passwordRecovery){passwordRecovery=false}}
+ override fun onCreate(s:Bundle?){super.onCreate(s);passwordRecovery=isPasswordRecoveryIntent(intent);runCatching { if (SupabaseClientProvider.isConfigured) SupabaseClientProvider.client.handleDeeplinks(intent) };setContent{MoneyFamilyApp(authRefreshVersion,passwordRecovery){passwordRecovery=false}}}
  override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);passwordRecovery=isPasswordRecoveryIntent(intent);runCatching { if (SupabaseClientProvider.isConfigured) SupabaseClientProvider.client.handleDeeplinks(intent) };authRefreshVersion++}
 }
 
