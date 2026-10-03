@@ -1,5 +1,7 @@
 package com.moneyfamily.app.data
 
+import android.content.Context
+
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.Dispatchers
@@ -19,8 +21,13 @@ import java.util.UUID
 class CloudSyncRepository(
     private val room: RoomRepository,
     private val supabase: SupabaseRepository = SupabaseRepository(),
-    private val budgetStore: BudgetStore? = null
+    private val budgetStore: BudgetStore? = null,
+    private val context: Context
 ) {
+    private val cloudScopePrefs by lazy {
+        context.applicationContext.getSharedPreferences("moneyfamily_cloud_scope", Context.MODE_PRIVATE)
+    }
+
     private suspend fun syncReferenceData(familyId: String) {
         val localTypes = room.allTypesIncludingInactive()
         val localCategories = room.allCategoriesIncludingInactive()
@@ -140,6 +147,11 @@ class CloudSyncRepository(
             if (!SupabaseClientProvider.isConfigured) error("Cloud non configurato.")
             val currentUserId = supabase.currentUserId() ?: error("Account MoneyFamily non autenticato.")
             val familyId = supabase.ensureAccountWorkspace()
+            // Local operations can survive a logout. Their old cloud UUIDs belong
+            // to the previous account, so never reuse them when the active account
+            // changes (or on the first save after upgrading to this version).
+            val lastSavedFamilyId = cloudScopePrefs.getString("last_saved_family_id", null)
+            val accountScopeChanged = lastSavedFamilyId == null || lastSavedFamilyId != familyId
 
             syncReferenceData(familyId)
 
@@ -158,7 +170,7 @@ class CloudSyncRepository(
             val payloads = ArrayList<CloudOperationDto>(local.size)
 
             for (movement in local) {
-                var cloudId = movement.cloudId
+                var cloudId = if (accountScopeChanged) null else movement.cloudId
                 if (cloudId == null || !usedCloudIds.add(cloudId)) {
                     cloudId = UUID.randomUUID().toString()
                     usedCloudIds.add(cloudId)
@@ -207,6 +219,7 @@ class CloudSyncRepository(
             ).decodeSingle<ReplaceOperationsResult>()
 
             room.clearTombstones()
+            cloudScopePrefs.edit().putString("last_saved_family_id", familyId).apply()
             result.count
         }
     }
