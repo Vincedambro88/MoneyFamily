@@ -8,6 +8,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.util.UUID
 
 class CloudSyncRepository(
@@ -226,8 +228,8 @@ class CloudSyncRepository(
             // from returning an empty result for an otherwise authorized user.
             val remoteOperations = supabase.client.postgrest.rpc(
                 "get_family_operations",
-                kotlinx.serialization.json.buildJsonObject {
-                    kotlinx.serialization.json.put("p_family_id", familyId)
+                buildJsonObject {
+                    put("p_family_id", familyId)
                 }
             ).decodeList<CloudOperationDto>()
 
