@@ -430,6 +430,7 @@ private data class CloudOperationDto(
     @SerialName("operation_date") val operationDate: String,
     @SerialName("payment_method") val paymentMethod: String,
     @SerialName("created_by") val createdBy: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String,
     @SerialName("deleted_at") val deletedAt: String? = null
 )
