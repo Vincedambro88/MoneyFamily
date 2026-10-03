@@ -273,7 +273,8 @@ class CloudSyncRepository(
             }
 
             room.replaceOperationsFromCloud(uniqueRestored)
-            syncBudgets(familyId)            uniqueRestored.size
+            syncBudgets(familyId)
+            uniqueRestored.size
         }
     }
 
