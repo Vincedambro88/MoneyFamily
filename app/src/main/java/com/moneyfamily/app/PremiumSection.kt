@@ -129,7 +129,7 @@ fun PremiumSection(
                     Text("• Confronto dei costi effettivi tra due mesi oppure due anni.")
                     Text("• Confronto per tipologia e per categoria.")
                     Text("• Salvataggio e sincronizzazione Cloud tramite Supabase.")
-                    Text("• Accesso condiviso allo stesso account per tutta la famiglia, così da aggiornare i dati online da più dispositivi.")
+                    Text("• Accesso allo stesso account su più dispositivi, per mantenere i dati Cloud sincronizzati.")
 
                     if (!isPremium && !setupRequired) {
                         val price = billing.price()
