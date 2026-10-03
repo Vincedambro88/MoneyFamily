@@ -16,9 +16,10 @@ class CloudSyncRepository(
     private val budgetStore: BudgetStore? = null
 ) {
     private suspend fun syncReferenceData(familyId: String) {
-        val localTypes = room.allTypes()
-        val localCategories = room.allCategories()
-        val localMembers = room.allMembers()
+        val localTypes = room.allTypesIncludingInactive()
+        val localCategories = room.allCategoriesIncludingInactive()
+        val localMembers = room.allMembersIncludingInactive()
+        val currentUserEmail = supabase.currentUserEmail().orEmpty()
 
         val remoteTypes = supabase.client.from("typologies").select {
             filter { eq("family_id", familyId) }
@@ -52,9 +53,20 @@ class CloudSyncRepository(
             supabase.client.from("categories").upsert(categoryPayloads)
         }
 
+        // A logged-in account is not a household member. Household members are
+        // represented separately from authentication users.
+        val remoteHouseholdMembers = remoteMembers.filter { it.userId == null }
+        remoteMembers.filter { it.userId != null }.forEach { accountMember ->
+            room.removeMemberByName(accountMember.displayName)
+        }
+        val householdLocalMembers = localMembers.filterNot {
+            it.name.equals(currentUserEmail.substringBefore("@"), true) ||
+            remoteMembers.any { remote -> remote.userId != null && remote.displayName.equals(it.name, true) }
+        }
+
         val memberIds = mutableMapOf<String, String>()
-        val memberPayloads = localMembers.map { local ->
-            val remote = remoteMembers.firstOrNull { it.displayName.equals(local.name, true) }
+        val memberPayloads = householdLocalMembers.map { local ->
+            val remote = remoteHouseholdMembers.firstOrNull { it.displayName.equals(local.name, true) }
             val id = remote?.id ?: UUID.nameUUIDFromBytes((familyId + ":member:" + local.name.lowercase()).toByteArray()).toString()
             memberIds[local.id.toString()] = id
             CloudMemberDto(id, familyId, null, local.name, "member")
@@ -74,7 +86,7 @@ class CloudSyncRepository(
                 room.addCategory(remote.name)
             }
         }
-        for (remote in remoteMembers) {
+        for (remote in remoteHouseholdMembers) {
             if (localMembers.none { it.name.equals(remote.displayName, true) }) {
                 room.addMember(remote.displayName)
             }
