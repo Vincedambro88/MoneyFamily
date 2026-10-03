@@ -170,36 +170,72 @@ fun PremiumSection(
                             "I dati restano sul dispositivo e vengono inviati al Cloud solo quando lo richiedi.",
                             style = MaterialTheme.typography.bodySmall
                         )
-                        Button(
-                            enabled = !cloudBusy && SupabaseClientProvider.isConfigured && email != null,
-                            onClick = {
-                                scope.launch {
-                                    cloudBusy = true
-                                    cloudMessage = null
-                                    try {
-                                        withTimeout(30_000L) {
-                                            cloudSync.sync()
-                                                .onSuccess {
-                                                    cloudMessage = "Dati salvati sul Cloud correttamente."
-                                                }
-                                                .onFailure {
-                                                    cloudMessage = "Salvataggio Cloud non riuscito: " + (it.message ?: "errore")
-                                                }
-                                        }
-                                    } catch (t: Throwable) {
-                                        cloudMessage = if (t is kotlinx.coroutines.TimeoutCancellationException) {
-                                            "Salvataggio Cloud non riuscito: timeout dopo 30 secondi."
-                                        } else {
-                                            "Salvataggio Cloud non riuscito: " + (t.message ?: "errore")
-                                        }
-                                    } finally {
-                                        cloudBusy = false
-                                    }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(if (cloudBusy) "Salvataggio in corso…" else "☁️ Salva dati sul Cloud")
+                            Button(
+                                enabled = !cloudBusy && SupabaseClientProvider.isConfigured && email != null,
+                                onClick = {
+                                    scope.launch {
+                                        cloudBusy = true
+                                        cloudMessage = null
+                                        try {
+                                            withTimeout(30_000L) {
+                                                cloudSync.sync()
+                                                    .onSuccess {
+                                                        cloudMessage = "Dati salvati sul Cloud correttamente."
+                                                    }
+                                                    .onFailure {
+                                                        cloudMessage = "Salvataggio Cloud non riuscito: " + (it.message ?: "errore")
+                                                    }
+                                            }
+                                        } catch (t: Throwable) {
+                                            cloudMessage = if (t is kotlinx.coroutines.TimeoutCancellationException) {
+                                                "Salvataggio Cloud non riuscito: timeout dopo 30 secondi."
+                                            } else {
+                                                "Salvataggio Cloud non riuscito: " + (t.message ?: "errore")
+                                            }
+                                        } finally {
+                                            cloudBusy = false
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(if (cloudBusy) "Salvataggio…" else "☁️ Salva sul Cloud")
+                            }
+                            OutlinedButton(
+                                enabled = !cloudBusy && SupabaseClientProvider.isConfigured && email != null,
+                                onClick = {
+                                    scope.launch {
+                                        cloudBusy = true
+                                        cloudMessage = null
+                                        try {
+                                            withTimeout(30_000L) {
+                                                cloudSync.sync()
+                                                    .onSuccess {
+                                                        cloudMessage = "Dati del Cloud caricati sul dispositivo."
+                                                    }
+                                                    .onFailure {
+                                                        cloudMessage = "Caricamento Cloud non riuscito: " + (it.message ?: "errore")
+                                                    }
+                                            }
+                                        } catch (t: Throwable) {
+                                            cloudMessage = if (t is kotlinx.coroutines.TimeoutCancellationException) {
+                                                "Caricamento Cloud non riuscito: timeout dopo 30 secondi."
+                                            } else {
+                                                "Caricamento Cloud non riuscito: " + (t.message ?: "errore")
+                                            }
+                                        } finally {
+                                            cloudBusy = false
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(if (cloudBusy) "Caricamento…" else "☁️ Carica dal Cloud")
+                            }
                         }
                         cloudMessage?.let {
                             Text(
