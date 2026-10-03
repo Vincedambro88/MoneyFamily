@@ -97,3 +97,5 @@ jobs:
           if-no-files-found: error
 
 # Password recovery deeplink release validation
+
+# Password recovery UI verification build
