@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import java.util.UUID
 
 class CloudSyncRepository(
@@ -171,12 +173,15 @@ class CloudSyncRepository(
                 )
             }
 
-            val result = supabase.client.postgrest.rpc(
-                "replace_family_operations",
+            val rpcParams = Json.encodeToJsonElement(
                 ReplaceOperationsParams(
                     pFamilyId = familyId,
                     pOperations = payloads
                 )
+            ).jsonObject
+            val result = supabase.client.postgrest.rpc(
+                "replace_family_operations",
+                rpcParams
             ).decodeSingle<ReplaceOperationsResult>()
 
             room.clearTombstones()
