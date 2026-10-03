@@ -22,8 +22,8 @@ android {
         applicationId = "com.vdapps.moneyfamily"
         minSdk = 26
         targetSdk = 36
-        versionCode = 17
-        versionName = "1.2.9"
+        versionCode = 18
+        versionName = "1.2.10"
 
         val localProperties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
@@ -61,6 +61,7 @@ android {
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-android-optimize.txt",
                 "proguard-rules.pro"
             )
         }
@@ -83,10 +84,10 @@ dependencies {
     ksp("androidx.room:room-compiler:2.7.2")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("com.android.billingclient:billing-ktx:8.3.0")
-    implementation(platform("io.github.jan-tennert.supabase:bom:3.1.4"))
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.3.0"))
     implementation("io.github.jan-tennert.supabase:auth-kt")
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("io.github.jan-tennert.supabase:functions-kt")
-    implementation("io.ktor:ktor-client-android:3.1.1")
+    implementation("io.ktor:ktor-client-android:3.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 }
