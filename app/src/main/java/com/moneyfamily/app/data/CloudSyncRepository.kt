@@ -237,66 +237,45 @@ class CloudSyncRepository(
                 page++
             }
 
-            val local = room.allEntities()
-            val localByCloudId = local.mapNotNull { entity ->
-                entity.cloudId?.let { it to entity }
-            }.toMap()
-            val usedIds = local.map { it.id }.toHashSet()
-            var imported = 0
-
-            for (remote in remoteOperations) {
-                if (remote.deletedAt != null) continue
-
-                val localEntity = localByCloudId[remote.id]
-                if (localEntity != null) {
-                    if (remote.updatedAt.isAfterTimestamp(localEntity.updatedAt)) {
-                        val typeName = remoteTypes.firstOrNull { it.id == remote.typologyId }?.name.orEmpty()
-                        val category = remoteCategories.firstOrNull { it.id == remote.categoryId }?.name.orEmpty()
-                        val member = remoteMembers.firstOrNull { it.id == remote.memberId }?.displayName.orEmpty()
-                        room.updateCloud(
-                            Movement(
-                                id = localEntity.id,
-                                type = if (remote.amount >= 0) MovementType.INCOME else MovementType.EXPENSE,
-                                amount = remote.amount,
-                                category = category,
-                                description = remote.description,
-                                date = remote.operationDate.fromSupabaseDate(),
-                                member = member,
-                                paymentMethod = remote.paymentMethod,
-                                typeName = typeName
-                            ),
-                            remote.id,
-                            remote.updatedAt
-                        )
-                    }
-                    continue
+            // "Carica dal Cloud" is an explicit restore: the Cloud snapshot
+            // becomes the local source of truth. Fetch everything first; only then
+            // replace Room atomically, so a failed download never destroys local data.
+            val restored = remoteOperations
+                .filter { it.deletedAt == null }
+                .mapNotNull { remote ->
+                    val typeName = remoteTypes.firstOrNull { it.id == remote.typologyId }?.name.orEmpty()
+                    val category = remoteCategories.firstOrNull { it.id == remote.categoryId }?.name.orEmpty()
+                    val member = remoteMembers.firstOrNull { it.id == remote.memberId }?.displayName.orEmpty()
+                    if (remote.id.isBlank()) null else MovementWithCloudId(
+                        movement = Movement(
+                            id = -(remote.id.hashCode().toLong() and Long.MAX_VALUE).coerceAtLeast(1L),
+                            type = if (remote.amount >= 0) MovementType.INCOME else MovementType.EXPENSE,
+                            amount = remote.amount,
+                            category = category,
+                            description = remote.description,
+                            date = remote.operationDate.fromSupabaseDate(),
+                            member = member,
+                            paymentMethod = remote.paymentMethod,
+                            typeName = typeName
+                        ),
+                        cloudId = remote.id,
+                        updatedAt = remote.updatedAt
+                    )
                 }
 
-                val typeName = remoteTypes.firstOrNull { it.id == remote.typologyId }?.name.orEmpty()
-                val category = remoteCategories.firstOrNull { it.id == remote.categoryId }?.name.orEmpty()
-                val member = remoteMembers.firstOrNull { it.id == remote.memberId }?.displayName.orEmpty()
-                var generatedId = -(remote.id.hashCode().toLong() and Long.MAX_VALUE).coerceAtLeast(1L)
-                while (!usedIds.add(generatedId)) generatedId--
-
-                room.insertCloud(
-                    Movement(
-                        id = generatedId,
-                        type = if (remote.amount >= 0) MovementType.INCOME else MovementType.EXPENSE,
-                        amount = remote.amount,
-                        category = category,
-                        description = remote.description,
-                        date = remote.operationDate.fromSupabaseDate(),
-                        member = member,
-                        paymentMethod = remote.paymentMethod,
-                        typeName = typeName
-                    ),
-                    remote.id,
-                    remote.updatedAt
-                )
-                imported++
+            val uniqueRestored = buildList {
+                val usedIds = mutableSetOf<Long>()
+                for (item in restored) {
+                    var id = item.movement.id
+                    while (!usedIds.add(id)) id--
+                    add(item.copy(movement = item.movement.copy(id = id)))
+                }
             }
 
+            room.replaceOperationsFromCloud(uniqueRestored)
             syncBudgets(familyId)
+            uniqueRestored.size
+
             imported
         }
     }
