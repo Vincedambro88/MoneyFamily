@@ -21,7 +21,7 @@ fun PremiumSection(
     isPremium: Boolean,
     onPremiumChanged: (Boolean) -> Unit,
     onAccountChanged: () -> Unit,
-    onCloudDataChanged: () -> Unit = {},
+    onCloudDataChanged: suspend () -> Unit = {},
     authRefreshVersion: Int = 0
 ) {
     val context = LocalContext.current
@@ -216,7 +216,7 @@ fun PremiumSection(
                                             withTimeout(60_000L) {
                                                 cloudSync.loadFromCloud()
                                                     .onSuccess { count ->
-                                                        cloudMessage = "Caricamento completato: $count nuove operazioni importate."
+                                                        cloudMessage = "Caricamento completato: $count operazioni ripristinate dal Cloud."
                                                         onCloudDataChanged()
                                                     }
                                                     .onFailure {
