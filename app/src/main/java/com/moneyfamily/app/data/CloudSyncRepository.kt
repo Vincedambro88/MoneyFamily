@@ -10,6 +10,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.decodeFromJsonElement
 import java.util.UUID
 
 class CloudSyncRepository(
@@ -220,16 +222,16 @@ class CloudSyncRepository(
             val remoteMembers = supabase.client.from("family_members").select {
                 filter { eq("family_id", familyId) }
             }.decodeList<CloudMemberDto>()
-            // Read the complete family snapshot through a dedicated
-            // SECURITY DEFINER RPC. This avoids the 1000-row PostgREST
-            // response limit and prevents an operations-table RLS mismatch
-            // from returning an empty result for an otherwise authorized user.
-            val remoteOperations = supabase.client.postgrest.rpc(
-                "get_family_operations",
+            // Read the complete account snapshot through a SECURITY DEFINER RPC.
+            // The RPC returns one JSONB value containing the whole operation array,
+            // so PostgREST's 1000-row response cap cannot truncate the snapshot.
+            val remoteOperationsJson = supabase.client.postgrest.rpc(
+                "get_account_operations",
                 buildJsonObject {
-                    put("p_family_id", familyId)
+                    put("p_workspace_id", familyId)
                 }
-            ).decodeList<CloudOperationDto>()
+            ).decodeSingle<JsonElement>()
+            val remoteOperations = Json.decodeFromJsonElement<List<CloudOperationDto>>(remoteOperationsJson)
 
             // "Carica dal Cloud" is an explicit restore: the Cloud snapshot
             // becomes the local source of truth. Fetch everything first; only then
