@@ -265,7 +265,7 @@ fun PremiumSection(
 
                     if (!SupabaseClientProvider.isConfigured) {
                         Text("Cloud non configurato su questo dispositivo. Il funzionamento locale della versione Free resta invariato.")
-                    } else if (email == null) {
+                    } else if (email == null || recoveryActive) {
                         if (setupRequired) {
                             Text(
                                 "Il pagamento Google Play è stato rilevato. Per sbloccare Premium devi accedere o creare un account MoneyFamily."
