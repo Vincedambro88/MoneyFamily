@@ -168,6 +168,7 @@ class CloudSyncRepository(
             val local = room.allEntities()
             val usedCloudIds = mutableSetOf<String>()
             val payloads = ArrayList<CloudOperationDto>(local.size)
+            val cloudUpdates = ArrayList<MovementEntity>()
 
             for (movement in local) {
                 var cloudId = if (accountScopeChanged) null else movement.cloudId
@@ -183,7 +184,7 @@ class CloudSyncRepository(
                 }
 
                 if (movement.cloudId != cloudId || movement.updatedAt != timestamp) {
-                    room.setCloudId(movement.id, cloudId, timestamp)
+                    cloudUpdates += movement.copy(cloudId = cloudId, updatedAt = timestamp)
                 }
 
                 val typologyId = remoteTypes.firstOrNull { it.name.equals(movement.typeName, true) }?.id
@@ -205,6 +206,12 @@ class CloudSyncRepository(
                     deletedAt = null
                 )
             }
+
+            // Persist all local cloud IDs in one Room transaction. The previous
+            // implementation performed a full SELECT + UPDATE for every operation,
+            // which becomes quadratic and can exceed the 60-second UI timeout with
+            // large datasets (e.g. ~2,000 operations).
+            room.setCloudIds(cloudUpdates)
 
             val rpcParams = Json.encodeToJsonElement(
                 ReplaceOperationsParams.serializer(),
