@@ -30,6 +30,7 @@ class RoomRepository(private val context: Context) {
     suspend fun deleteAll(items: List<Movement>) { items.forEach { delete(it) } }
     suspend fun allTombstones(): List<OperationTombstone> = tombstones.getAll()
     suspend fun removeTombstone(cloudId: String) = tombstones.delete(cloudId)
+    suspend fun clearTombstones() = tombstones.deleteAll()
     suspend fun deleteByCloudId(cloudId: String) = dao.deleteByCloudId(cloudId)
 
     suspend fun setCloudId(localId: Long, cloudId: String, updatedAt: String? = null) {
