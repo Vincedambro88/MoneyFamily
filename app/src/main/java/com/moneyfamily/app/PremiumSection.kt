@@ -337,7 +337,9 @@ fun PremiumSection(
                                                 recoveryActive = false
                                                 resetSent = false
                                                 mode = "login"
+                                                inputEmail = email ?: inputEmail
                                                 refreshKey++
+                                                onAccountChanged()
                                             }
                                             .onFailure {
                                                 error = it.message ?: "Impossibile aggiornare la password."
