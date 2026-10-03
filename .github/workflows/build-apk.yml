@@ -99,3 +99,5 @@ jobs:
 # Password recovery deeplink release validation
 
 # Password recovery UI verification build
+
+# Force release CI after password recovery UI fix
