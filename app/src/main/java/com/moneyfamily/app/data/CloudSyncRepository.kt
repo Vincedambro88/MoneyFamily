@@ -208,9 +208,22 @@ class CloudSyncRepository(
             val remoteMembers = supabase.client.from("family_members").select {
                 filter { eq("family_id", familyId) }
             }.decodeList<CloudMemberDto>()
-            val remoteOperations = supabase.client.from("operations").select {
-                filter { eq("family_id", familyId) }
-            }.decodeList<CloudOperationDto>()
+            // PostgREST limits a single response to 1000 rows by default.
+            // Fetch operations in pages so every Cloud operation is restored.
+            val remoteOperations = mutableListOf<CloudOperationDto>()
+            val pageSize = 500
+            var page = 0
+            while (true) {
+                val from = page * pageSize
+                val to = from + pageSize - 1
+                val batch = supabase.client.from("operations").select {
+                    filter { eq("family_id", familyId) }
+                    range(from.toLong(), to.toLong())
+                }.decodeList<CloudOperationDto>()
+                remoteOperations += batch
+                if (batch.size < pageSize) break
+                page++
+            }
 
             val local = room.allEntities()
             val localByCloudId = local.mapNotNull { entity ->
