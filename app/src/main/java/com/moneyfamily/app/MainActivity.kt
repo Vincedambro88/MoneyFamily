@@ -105,7 +105,22 @@ class MainActivity:ComponentActivity(){
         }
     )
 }
- LaunchedEffect(Unit, authRefreshVersion){premiumSetupRequired=premiumBilling.isPremiumSetupRequired();isPremium=premiumBilling.isPremium();refresh()}
+ LaunchedEffect(Unit, authRefreshVersion){
+  premiumSetupRequired=premiumBilling.isPremiumSetupRequired()
+  isPremium=premiumBilling.isPremium()
+  refresh()
+  if(SupabaseClientProvider.isConfigured){
+    scope.launch {
+      runCatching { supabaseRepo.isPremiumForCurrentAccount() }
+        .onSuccess { remotePremium ->
+          isPremium = remotePremium
+          if(remotePremium){
+            cloudSync.sync().onSuccess { refresh() }
+          }
+        }
+    }
+  }
+}
  DisposableEffect(Unit){onDispose{premiumBilling.close();repo.close()}}
  fun save(x:UiMovement){scope.launch{val m=x.model();if(data.any{it.id==x.id})repo.update(m)else repo.insert(m);refresh();cloudSync.sync().onSuccess { refresh() }}}
  fun remove(x:UiMovement){scope.launch{repo.delete(x.model());refresh();cloudSync.sync().onSuccess { refresh() }}}
