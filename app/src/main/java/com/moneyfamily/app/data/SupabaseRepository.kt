@@ -37,20 +37,43 @@ class SupabaseRepository(
     }
 
     suspend fun signUp(email: String, password: String): String? = withContext(Dispatchers.IO) {
-        client.auth.signUpWith(Email) {
-            this.email = email.trim()
-            this.password = password
+        try {
+            client.auth.signUpWith(Email) {
+                this.email = email.trim()
+                this.password = password
+            }
+            val userId = client.auth.currentUserOrNull()?.id
+                ?: error("Account creato ma sessione Cloud non disponibile.")
+            ensureAccountWorkspace()
+            userId
+        } catch (t: Throwable) {
+            throw IllegalStateException(friendlyAuthError(t), t)
         }
-        val userId = client.auth.currentUserOrNull()?.id
-            ?: error("Account creato ma sessione Cloud non disponibile.")
-        ensureAccountWorkspace()
-        userId
     }
 
     suspend fun signIn(email: String, password: String) = withContext(Dispatchers.IO) {
-        client.auth.signInWith(Email) {
-            this.email = email.trim()
-            this.password = password
+        try {
+            client.auth.signInWith(Email) {
+                this.email = email.trim()
+                this.password = password
+            }
+        } catch (t: Throwable) {
+            throw IllegalStateException(friendlyAuthError(t), t)
+        }
+    }
+
+    private fun friendlyAuthError(t: Throwable): String {
+        val raw = generateSequence(t) { it.cause }
+            .joinToString(" | ") { it.message.orEmpty() }
+            .lowercase()
+
+        return when {
+            "user_already_exists" in raw || "user already registered" in raw ->
+                "Utente già esistente. Se hai già un account, usa «Accedi»."
+            "invalid_credentials" in raw || "invalid login credentials" in raw ->
+                "Password errata. Riprova."
+            else ->
+                t.message ?: "Operazione di autenticazione non riuscita."
         }
     }
 
