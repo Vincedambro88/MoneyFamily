@@ -22,8 +22,8 @@ android {
         applicationId = "com.vdapps.moneyfamily"
         minSdk = 26
         targetSdk = 36
-        versionCode = 30
-        versionName = "1.2.22"
+        versionCode = 31
+        versionName = "1.2.23"
 
         val localProperties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
