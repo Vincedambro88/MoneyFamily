@@ -40,27 +40,37 @@ class CloudSyncRepository(
         }.decodeList<CloudMemberDto>()
 
         val typeIds = mutableMapOf<String, String>()
-        localTypes.forEach { local ->
+        val typeIds = mutableMapOf<String, String>()
+        val typePayloads = localTypes.map { local ->
             val remote = remoteTypes.firstOrNull { it.name.equals(local.name, true) }
             val id = remote?.id ?: UUID.nameUUIDFromBytes((familyId + ":type:" + local.name.lowercase()).toByteArray()).toString()
-            supabase.client.from("typologies").upsert(CloudTypologyDto(id, familyId, local.name, local.active))
             typeIds[local.id.toString()] = id
+            CloudTypologyDto(id, familyId, local.name, local.active)
+        }
+        if (typePayloads.isNotEmpty()) {
+            supabase.client.from("typologies").upsert(typePayloads)
         }
 
         val categoryIds = mutableMapOf<String, String>()
-        localCategories.forEach { local ->
+        val categoryPayloads = localCategories.map { local ->
             val remote = remoteCategories.firstOrNull { it.name.equals(local.name, true) }
             val id = remote?.id ?: UUID.nameUUIDFromBytes((familyId + ":category:" + local.name.lowercase()).toByteArray()).toString()
-            supabase.client.from("categories").upsert(CloudCategoryDto(id, familyId, local.name, local.active))
             categoryIds[local.id.toString()] = id
+            CloudCategoryDto(id, familyId, local.name, local.active)
+        }
+        if (categoryPayloads.isNotEmpty()) {
+            supabase.client.from("categories").upsert(categoryPayloads)
         }
 
         val memberIds = mutableMapOf<String, String>()
-        localMembers.forEach { local ->
+        val memberPayloads = localMembers.map { local ->
             val remote = remoteMembers.firstOrNull { it.displayName.equals(local.name, true) }
             val id = remote?.id ?: UUID.nameUUIDFromBytes((familyId + ":member:" + local.name.lowercase()).toByteArray()).toString()
-            supabase.client.from("family_members").upsert(CloudMemberDto(id, familyId, null, local.name, "member"))
             memberIds[local.id.toString()] = id
+            CloudMemberDto(id, familyId, null, local.name, "member")
+        }
+        if (memberPayloads.isNotEmpty()) {
+            supabase.client.from("family_members").upsert(memberPayloads)
         }
 
         // Import reference data created on another device before pushing local changes.
