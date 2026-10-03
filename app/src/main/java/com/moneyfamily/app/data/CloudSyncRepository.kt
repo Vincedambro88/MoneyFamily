@@ -8,6 +8,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.JsonElement
@@ -44,7 +45,9 @@ class CloudSyncRepository(
             CloudTypologyDto(id, familyId, local.name, local.active)
         }
         if (typePayloads.isNotEmpty()) {
-            supabase.client.from("typologies").upsert(typePayloads, defaultToNull = false)
+            supabase.client.from("typologies").upsert(buildJsonArray {
+                typePayloads.forEach { add(Json.encodeToJsonElement(CloudTypologyDto.serializer(), it)) }
+            })
         }
 
         val categoryIds = mutableMapOf<String, String>()
@@ -55,7 +58,9 @@ class CloudSyncRepository(
             CloudCategoryDto(id, familyId, local.name, local.active)
         }
         if (categoryPayloads.isNotEmpty()) {
-            supabase.client.from("categories").upsert(categoryPayloads, defaultToNull = false)
+            supabase.client.from("categories").upsert(buildJsonArray {
+                categoryPayloads.forEach { add(Json.encodeToJsonElement(CloudCategoryDto.serializer(), it)) }
+            })
         }
 
         // A logged-in account is not a household member. Household members are
