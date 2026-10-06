@@ -139,6 +139,15 @@ private val mfResourceIds: Map<String, Int> = mapOf(
     "MoneyFamily Premium" to R.string.mf_moneyfamily_premium
 )
 
+
+private val mfDynamicPrefixTranslations: Map<String, Map<String, String>> = mapOf(
+    "en" to mapOf("Riepilogo annuale " to "Annual summary ", "Nessun dato per il mese" to "No data for this month"),
+    "de" to mapOf("Riepilogo annuale " to "Jahresübersicht ", "Nessun dato per il mese" to "Keine Daten für diesen Monat"),
+    "fr" to mapOf("Riepilogo annuale " to "Résumé annuel ", "Nessun dato per il mese" to "Aucune donnée pour ce mois"),
+    "es" to mapOf("Riepilogo annuale " to "Resumen anual ", "Nessun dato per il mese" to "No hay datos para este mes"),
+    "pt" to mapOf("Riepilogo annuale " to "Resumo anual ", "Nessun dato per il mese" to "Sem dados para este mês")
+)
+
 private val mfPrefixTranslations: Map<String, Map<String, String>> = mapOf(
     "en" to mapOf(
         "Entrate: " to "Income: ", "Uscite: " to "Expenses: ", "Saldo: " to "Balance: ", "Ricavi: " to "Income: ", "Spese: " to "Expenses: ",
@@ -164,7 +173,7 @@ private fun localizeMoneyFamily(text: String): String {
         if (resourceId != null) return androidx.compose.ui.res.stringResource(resourceId)
     }
     var result = text
-    mfPrefixTranslations[lang].orEmpty().entries.sortedByDescending { it.key.length }.forEach { (from, to) ->
+    (mfPrefixTranslations[lang].orEmpty() + mfDynamicPrefixTranslations[lang].orEmpty()).entries.sortedByDescending { it.key.length }.forEach { (from, to) ->
         if (result.startsWith(from)) result = to + result.removePrefix(from)
     }
     return result
