@@ -140,6 +140,48 @@ private val mfResourceIds: Map<String, Int> = mapOf(
 )
 
 
+private val mfExtraTranslations: Map<String, Map<String, String>> = mapOf(
+    "en" to mapOf(
+        "Composizione esercizio " to "Year breakdown ", "Configurazione" to "Settings", "Nuova categoria" to "New category", "Nuova tipologia" to "New type", "Nuovo membro" to "New member",
+        "Modifica categoria" to "Edit category", "Modifica tipologia" to "Edit type", "Modifica membro" to "Edit member", "Modifica valore" to "Edit value", "Disattiva valore" to "Disable value",
+        "Tocca la categoria per modificarla." to "Tap the category to edit it.", "Nome" to "Name", "Nome famiglia" to "Family name", "Membri della famiglia" to "Family members",
+        "Gestione anagrafiche" to "Master data management", "Nessuna famiglia associata a questo account." to "No family is associated with this account.",
+        "Cloud non configurato su questo dispositivo. Funzionamento locale invariato." to "Cloud is not configured on this device. Local operation is unchanged.",
+        "Cloud non configurato su questo dispositivo. Il funzionamento locale della versione Free resta invariato." to "Cloud is not configured on this device. Free version local operation is unchanged.",
+        "Con Premium sono disponibili:" to "With Premium you get:", "Sblocca Premium per test" to "Unlock Premium for testing",
+        "Budget, analisi avanzate e sincronizzazione sono sbloccati." to "Budget, advanced analysis and synchronization are unlocked.",
+        "Verifica dell'acquisto Premium in corso…" to "Verifying Premium purchase…", "Il prodotto Premium non è disponibile su Google Play." to "The Premium product is not available on Google Play.",
+        "Il prodotto Premium deve essere configurato su Google Play per rendere disponibile l'acquisto." to "The Premium product must be configured on Google Play to enable purchase.",
+        "Inserisci" to "Add", "Inserisci la nuova password per completare il recupero dell'account." to "Enter the new password to complete account recovery.",
+        "La password deve contenere almeno 6 caratteri." to "The password must contain at least 6 characters.", "Le password non coincidono." to "Passwords do not match.",
+        "Impossibile aggiornare la password." to "Unable to update password.", "Impossibile inviare il link di recupero." to "Unable to send the recovery link.",
+        "Se l'indirizzo è associato a un account, riceverai le istruzioni per impostare una nuova password." to "If the address is associated with an account, you will receive instructions to set a new password.",
+        "Accedi allo stesso account su più dispositivi per condividere la stessa famiglia." to "Use the same account on multiple devices to share the same family.",
+        "Usa lo stesso account sugli altri dispositivi per accedere agli stessi dati della famiglia." to "Use the same account on other devices to access the same family data.",
+        "Premium: condiviso a livello famiglia" to "Premium: shared at family level", "Membri:" to "Members:", "Famiglia:" to "Family:",
+        "Confronta due mesi specifici oppure due anni, per tipologia o categoria." to "Compare two specific months or two years, by type or category.",
+        "Nessun costo disponibile." to "No cost data available.", "Totale mensile" to "Monthly total",
+        "Cerca tra tutte le operazioni dell'anno" to "Search all operations in the year", "Cancella operazioni" to "Delete operations",
+        "Cancella operazioni dell'anno" to "Delete operations for the year", "Cancella tutte le operazioni del periodo" to "Delete all operations in the period",
+        "Annulla" to "Cancel", "Ripristino completato correttamente" to "Restore completed successfully", "Backup creato correttamente" to "Backup created successfully",
+        "Crea backup" to "Create backup", "Backup e ripristino" to "Backup and restore", "Ripristina backup" to "Restore backup",
+        "Salva una copia completa dei dati MoneyFamily in un file JSON. Il backup comprende operazioni e configurazioni." to "Save a complete copy of MoneyFamily data to a JSON file. The backup includes operations and configuration.",
+        "Seleziona un backup MoneyFamily precedentemente creato. I dati attuali verranno sostituiti." to "Select a previously created MoneyFamily backup. Current data will be replaced.",
+        "Esporta tutte le operazioni nello stesso tracciato previsto dal modello Excel." to "Export all operations using the same format required by the Excel template.",
+        "Cloud aggiornato" to "Cloud updated", "Caricamento completato" to "Upload completed", "Errore" to "Error", "Errore di connessione" to "Connection error",
+        "Operazione non riuscita" to "Operation failed", "Logout non riuscito" to "Logout failed", "Creazione famiglia non riuscita" to "Family creation failed",
+        "Caricamento Cloud non riuscito: timeout dopo 60 secondi." to "Cloud upload failed: timeout after 60 seconds.",
+        "Salvataggio Cloud non riuscito: timeout dopo 60 secondi." to "Cloud save failed: timeout after 60 seconds.",
+        "Visualizzazione attiva: solo CATEGORIE" to "Active view: CATEGORIES only", "Visualizzazione attiva: solo TIPOLOGIE" to "Active view: TYPES only",
+        "Raggruppa il confronto per:" to "Group comparison by:", "Copia budget al mese successivo" to "Copy budget to next month",
+        "⚠ Budget raggiunto/superato" to "⚠ Budget reached/exceeded", "⚠ Budget utilizzato almeno all'80%" to "⚠ Budget used at least 80%"
+    ),
+    "de" to mapOf("Configurazione" to "Einstellungen","Nuova categoria" to "Neue Kategorie","Nuova tipologia" to "Neue Typologie","Nuovo membro" to "Neues Mitglied","Modifica" to "Bearbeiten","Elimina" to "Löschen","Annulla" to "Abbrechen","Crea" to "Erstellen","Nome" to "Name","Nome famiglia" to "Familienname","Membri della famiglia" to "Familienmitglieder","Nessun dato" to "Keine Daten","Nessun costo disponibile." to "Keine Kostendaten verfügbar.","Totale mensile" to "Monatssumme","Errore di connessione" to "Verbindungsfehler","Operazione non riuscita" to "Vorgang fehlgeschlagen","Verifica dell'acquisto Premium in corso…" to "Premium-Kauf wird überprüft…"),
+    "fr" to mapOf("Configurazione" to "Paramètres","Nuova categoria" to "Nouvelle catégorie","Nuova tipologia" to "Nouveau type","Nuovo membro" to "Nouveau membre","Modifica" to "Modifier","Elimina" to "Supprimer","Annulla" to "Annuler","Crea" to "Créer","Nome" to "Nom","Nome famiglia" to "Nom de famille","Membri della famiglia" to "Membres de la famille","Nessun dato" to "Aucune donnée","Nessun costo disponibile." to "Aucune donnée de coût disponible.","Totale mensile" to "Total mensuel","Errore di connessione" to "Erreur de connexion","Operazione non riuscita" to "Opération échouée","Verifica dell'acquisto Premium in corso…" to "Vérification de l'achat Premium…"),
+    "es" to mapOf("Configurazione" to "Configuración","Nuova categoria" to "Nueva categoría","Nuova tipologia" to "Nuevo tipo","Nuovo membro" to "Nuevo miembro","Modifica" to "Editar","Elimina" to "Eliminar","Annulla" to "Cancelar","Crea" to "Crear","Nome" to "Nombre","Nome famiglia" to "Nombre de familia","Membri della famiglia" to "Miembros de la familia","Nessun dato" to "Sin datos","Nessun costo disponibile." to "No hay datos de costes disponibles.","Totale mensile" to "Total mensual","Errore di connessione" to "Error de conexión","Operazione non riuscita" to "Operación fallida","Verifica dell'acquisto Premium in corso…" to "Verificando la compra Premium…"),
+    "pt" to mapOf("Configurazione" to "Configurações","Nuova categoria" to "Nova categoria","Nuova tipologia" to "Novo tipo","Nuovo membro" to "Novo membro","Modifica" to "Editar","Elimina" to "Excluir","Annulla" to "Cancelar","Crea" to "Criar","Nome" to "Nome","Nome famiglia" to "Nome da família","Membri della famiglia" to "Membros da família","Nessun dato" to "Sem dados","Nessun costo disponibile." to "Sem dados de custos disponíveis.","Totale mensile" to "Total mensal","Errore di connessione" to "Erro de conexão","Operazione non riuscita" to "Operação falhou","Verifica dell'acquisto Premium in corso…" to "Verificando a compra Premium…")
+)
+
 private val mfDynamicPrefixTranslations: Map<String, Map<String, String>> = mapOf(
     "en" to mapOf("Riepilogo annuale " to "Annual summary ", "Nessun dato per il mese" to "No data for this month"),
     "de" to mapOf("Riepilogo annuale " to "Jahresübersicht ", "Nessun dato per il mese" to "Keine Daten für diesen Monat"),
@@ -173,7 +215,7 @@ private fun localizeMoneyFamily(text: String): String {
         if (resourceId != null) return androidx.compose.ui.res.stringResource(resourceId)
     }
     var result = text
-    (mfPrefixTranslations[lang].orEmpty() + mfDynamicPrefixTranslations[lang].orEmpty()).entries.sortedByDescending { it.key.length }.forEach { (from, to) ->
+    (mfExtraTranslations[lang].orEmpty() + mfPrefixTranslations[lang].orEmpty() + mfDynamicPrefixTranslations[lang].orEmpty()).entries.sortedByDescending { it.key.length }.forEach { (from, to) ->
         if (result.startsWith(from)) result = to + result.removePrefix(from)
     }
     return result
